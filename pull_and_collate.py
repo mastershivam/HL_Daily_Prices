@@ -2,7 +2,13 @@ from price_scraper import price_scraper_fund
 import pandas as pd
 import locale
 
-locale.setlocale(locale.LC_ALL, '')
+import locale
+for loc in ('en_GB.UTF-8', 'en_US.UTF-8', 'C.UTF-8'):
+    try:
+        locale.setlocale(locale.LC_ALL, loc)
+        break
+    except locale.Error:
+        continue
 from forex_python.converter import CurrencyRates
 
 def normalise_key(s: str) -> str:
