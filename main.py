@@ -21,8 +21,8 @@ SMTP_PORT=int(env('SMTP_PORT'))
 
 
 def assert_env():
-    missing = [n for n,v in {"SMTP_HOST":SMTP_SERVER, "SMTP_PORT":SMTP_PORT, "EMAIL_ADDRESS":EMAIL_FROM,
-    "EMAIL_APP_PASSWORD":APP_PASSWORD, "EMAIL_ADRESS":EMAIL_FROM}.items() if not v]
+    missing = [n for n,v in {"SMTP_HOST":SMTP_SERVER, "SMTP_PORT":SMTP_PORT, "EMAIL_FROM":EMAIL_FROM,
+    "SMTP_PASS":APP_PASSWORD, "EMAIL_FROM":EMAIL_FROM}.items() if not v]
     if missing:
         raise RuntimeError(f"Missing SMTP env vars: {', '.join(missing)}")
 
