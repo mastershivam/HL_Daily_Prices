@@ -12,9 +12,9 @@ def env(name):
     return v.strip() if isinstance(v, str) else v
 
 load_dotenv()
-EMAIL_FROM = env('EMAIL_ADDRESS')
-APP_PASSWORD = env('EMAIL_APP_PASSWORD')
-RECIPIENTS = [env('EMAIL_RECIPIENTS')]
+EMAIL_FROM = env('EMAIL_FROM')
+APP_PASSWORD = env('SMTP_PASS')
+RECIPIENTS = [env('EMAIL_TO')]
 SMTP_SERVER=env('SMTP_HOST')
 SMTP_PORT=int(env('SMTP_PORT'))
 
