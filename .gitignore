@@ -1,2 +1,8 @@
 .env
 .DS_Store
+*.html
+*.csv
+*.log
+summaries/
+# Ignore environment files
+.env

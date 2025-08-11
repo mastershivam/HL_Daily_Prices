@@ -75,7 +75,7 @@ def create_data_frame():
     
     USD_GBP_Rate=CurrencyRates().get_rate('USD','GBP')
     merged_data_df.loc[merged_data_df['currency'] == 'USD', 'value'] *= USD_GBP_Rate
-    print(merged_data_df)
+    
     
     return merged_data_df
 
