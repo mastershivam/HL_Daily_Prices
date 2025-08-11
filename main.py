@@ -64,7 +64,7 @@ def maybe_send_email(subject: str, html_body: str):
     Send the summary via HTML email if SMTP vars are set.
     Required ENV: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM, EMAIL_TO
     """
-    required = [SMTP_SERVER, SMTP_PORT, EMAIL_FROM, APP_PASSWORD, EMAIL_FROM, EMAIL_TO]
+    
     
 
     msg = MIMEText(html_body, "html", "utf-8")
