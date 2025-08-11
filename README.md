@@ -22,7 +22,6 @@ How it works
 
 Repo structure (key files)
 
-.
 ├─ main.py                  # Entry point: build + save + email daily summary
 ├─ pull_and_collate.py      # Pricing + dataframe assembly
 ├─ requirements.txt         # Runtime dependencies
