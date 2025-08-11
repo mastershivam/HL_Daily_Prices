@@ -24,6 +24,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+      - name: Fetch private data repo
+        env:
+          GH_PAT: ${{ secrets.DATA_REPO_TOKEN }}
+        run: |
+          git clone https://x-access-token:${GH_PAT}@github.com/mastershivam/HL_Daily_Prices_Data.git data_repo
+          cp data_repo/units.csv units.csv
+          cp data_repo/urls.csv urls.csv
 
       - name: Run script
         env:
