@@ -6,3 +6,6 @@
 summaries/
 # Ignore environment files
 .env
+
+units.csv
+urls.csv
