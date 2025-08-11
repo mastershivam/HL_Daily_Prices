@@ -7,18 +7,22 @@ from email.mime.text import MIMEText
 
 from dotenv import load_dotenv
 
+def env(name):
+    v = os.getenv(name, "")
+    return v.strip() if isinstance(v, str) else v
+
 load_dotenv()
-EMAIL_FROM = os.getenv('EMAIL_ADDRESS')
-APP_PASSWORD = os.getenv('EMAIL_APP_PASSWORD')
-RECIPIENTS = [os.getenv('EMAIL_RECIPIENTS')]
-SMTP_SERVER=os.getenv('SMTP_HOST')
-SMTP_PORT=os.getenv('SMTP_PORT')
-EMAIL_TO=os.getenv('EMAIL_RECIPIENTS')
+EMAIL_FROM = env('EMAIL_ADDRESS')
+APP_PASSWORD = env('EMAIL_APP_PASSWORD')
+RECIPIENTS = [env('EMAIL_RECIPIENTS')]
+SMTP_SERVER=env('SMTP_HOST')
+SMTP_PORT=int(env('SMTP_PORT'))
+
 
 
 def assert_env():
-    missing = [n for n,v in {"SMTP_HOST":SMTP_SERVER, "SMTP_PORT":SMTP_PORT, "SMTP_USER":EMAIL_FROM,
-    "SMTP_PASS":APP_PASSWORD, "EMAIL_FROM":EMAIL_FROM, "EMAIL_TO":EMAIL_TO}.items() if not v]
+    missing = [n for n,v in {"SMTP_HOST":SMTP_SERVER, "SMTP_PORT":SMTP_PORT, "EMAIL_ADDRESS":EMAIL_FROM,
+    "EMAIL_APP_PASSWORD":APP_PASSWORD, "EMAIL_ADRESS":EMAIL_FROM}.items() if not v]
     if missing:
         raise RuntimeError(f"Missing SMTP env vars: {', '.join(missing)}")
 
@@ -76,7 +80,7 @@ def maybe_send_email(subject: str, html_body: str):
     msg = MIMEText(html_body, "html", "utf-8")
     msg["Subject"] = subject
     msg["From"] = EMAIL_FROM
-    msg["To"] = EMAIL_TO
+    msg["To"] = RECIPIENTS
 
     with smtplib.SMTP(SMTP_SERVER, int(SMTP_PORT)) as s:
         s.starttls()
