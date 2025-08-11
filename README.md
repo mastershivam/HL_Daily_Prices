@@ -1,48 +1,54 @@
-**HL_Daily_Prices**
+# **HL Daily Prices**
 
-Automates a daily portfolio snapshot using Hargreaves Lansdown (HL) prices.
-Combines your instrument list + units, computes values, saves CSV/HTML summaries, and (optionally) emails a neat daily report. Runs locally or on GitHub Actions.
+>Automates a daily portfolio snapshot using Hargreaves Lansdown (HL) prices.
+>Combines your instrument list + units, computes values, saves CSV/HTML summaries, and (optionally) emails a neat daily report. Runs locally or on GitHub Actions.
 
-Features
-	•	Scrapes HL fund/share prices (handles £, $, and p formats)
-	•	Merges with your units & URLs
-	•	Computes per‑instrument value and total portfolio value
-	•	Saves daily_totals.csv and an HTML daily summary
-	•	Sends the summary via SMTP (Gmail/Outlook etc.)
-	•	Scheduled via GitHub Actions
-	•	Supports keeping data files private in a separate repo
+## Features:
+- Scrapes HL fund/share prices (handles £, $, and p formats)
+- Merges with your units & URLs
+- Computes per‑instrument value and total portfolio value
+- Saves daily_totals.csv and an HTML daily summary
+- Sends the summary via SMTP (Gmail/Outlook etc.)
+- Scheduled via GitHub Actions
+- Supports keeping data files private in a separate repo
 
-How it works
-	•	pull_and_collate.py → create_data_frame() returns a DataFrame indexed by instrument name with columns like units, sell, value, …
-	•	main.py:
-	•	    builds today’s table and total
-	•	    writes/updates daily_totals.csv
-	•	    generates summaries/daily_summary-YYYY-MM-DD.html
-	•	emails the HTML summary (if SMTP env vars are set)
+## How it works
 
-Repo structure (key files)
+- pull_and_collate.py → create_data_frame() returns a DataFrame indexed by instrument name with columns like units, sell, value, …
+- main.py:
+	- builds today’s table and total
+	- writes/updates daily_totals.csv
+	- generates summaries/daily_summary-YYYY-MM-DD.html
+	- emails the HTML summary (if SMTP env vars are set)
+
+## Repo structure (key files)
 
 ├─ main.py                  # Entry point: build + save + email daily summary
+
 ├─ pull_and_collate.py      # Pricing + dataframe assembly
+
 ├─ requirements.txt         # Runtime dependencies
+
 ├─ .github/workflows/       # GitHub Actions workflow(s)
+
 ├─ .gitignore               # Ignores data and generated files
+
 └─ summaries/               # (generated) Daily HTML summaries (gitignored)
 
 Note: CSV/HTML/log files are gitignored so the public repo doesn’t leak data.
 
-**Setup (local)**
-	1.	Python env
+## **Setup (local)**
+1. Python env
 
         python -m venv .venv
         source .venv/bin/activate   # macOS/Linux
         # .venv\Scripts\activate    # Windows
         pip install -r requirements.txt
 
-	2.	Environment variables
-        Create a .env in the repo root (not committed) with one of the following sets:
+2. Environment variables
+	Create a .env in the repo root (not committed) with one of the following sets:
 
-        Generic SMTP
+	Generic SMTP
 
         SMTP_HOST=smtp.gmail.com
         SMTP_PORT=587
@@ -51,107 +57,44 @@ Note: CSV/HTML/log files are gitignored so the public repo doesn’t leak data.
         EMAIL_FROM=your_email@example.com
         EMAIL_TO=recipient1@example.com,recipient2@example.com
 
-        Alternate names (supported automatically)
+	Alternate names (supported automatically)
 
         EMAIL_ADDRESS=your_email@example.com
         EMAIL_APP_PASSWORD=your_app_password
         EMAIL_RECIPIENTS=recipient@example.com
 
-	3.	Run
+3. Run
 
         python main.py
 
-Keep data files private (recommended)
+### *Keep data files private (recommended)*
 
-Put confidential files (e.g., units.csv, urls.csv) in a separate private repo, e.g. HL_Daily_Prices_Data.
-    •	Create a fine‑grained PAT with Contents: Read-only for that repo.
-    •	In your public repo’s workflow, clone the private repo at runtime and copy the files:
+- Put confidential files (e.g., units.csv, urls.csv) in a separate private repo, e.g. HL_Daily_Prices_Data.
+- Create a fine‑grained PAT with Contents: Read-only for that repo.
+- In your public repo’s workflow, clone the private repo at runtime and copy the files:
 
+### *Outputs*
+- daily_totals.csv — running table keyed by date (YYYY-MM-DD) with total and per‑instrument values
+- summaries/daily_summary-YYYY-MM-DD.html — styled HTML summary
+- summaries/latest.html — last run’s summary (overwritten each run)
 
-# .github/workflows/daily.yml
-name: Daily Portfolio
+### *Troubleshooting*
 
-on:
-  schedule:
-    - cron: "0 18 * * *"   # 18:00 UTC daily
-  workflow_dispatch:
+*SMTP auth fails / NoneType.encode or (334, 'Password:'):*
+- Ensure env names match; main.py accepts either SMTP_* or EMAIL_ADDRESS/EMAIL_APP_PASSWORD/EMAIL_RECIPIENTS.
+- Use an App Password (Gmail/Outlook) and starttls() on port 587.
 
-jobs:
-  run:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+*Locale errors on GitHub Actions:*
+- The code avoids locale.atof—prices are parsed by stripping £,$,p, and commas. No locale needed.
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+*USD/GBP/pence parsing:*
+- Handled in code; p prices are converted to pounds, $ handled as USD with currency column and conversion if configured.
 
-      - name: Install deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+*Files not found when copying from the private repo:*
+- Check the path; if your files are in a subfolder, update the cp commands accordingly.
 
-      - name: Fetch private data repo
-        env:
-          GH_PAT: ${{ secrets.DATA_REPO_TOKEN }}     # PAT with read access to HL_Daily_Prices_Data
-        run: |
-          git clone https://x-access-token:${GH_PAT}@github.com/<your-username>/HL_Daily_Prices_Data.git data_repo
-          cp data_repo/units.csv units.csv
-          cp data_repo/urls.csv  urls.csv
+*Security notes*
+- Secrets are stored in GitHub Actions → Secrets.
+- For full historical scrubbing (if you ever committed data), use git filter-repo.
 
-      - name: Run script
-        env:
-          # Either generic SMTP_* or the alternate names—both are supported by main.py
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASS: ${{ secrets.SMTP_PASS }}
-          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
-          EMAIL_TO: ${{ secrets.EMAIL_TO }}
-          # or:
-          EMAIL_ADDRESS: ${{ secrets.EMAIL_ADDRESS }}
-          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
-          EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
-        run: python main.py
-
-      # Optional: upload artifacts for manual download
-      - name: Upload outputs
-        uses: actions/upload-artifact@v4
-        with:
-          name: daily-output
-          path: |
-            daily_totals.csv
-            summaries/*.html
-          retention-days: 30
-
-Replace <your-username> and add a repo secret DATA_REPO_TOKEN (the PAT).
-Ensure units.txt/urls.csv live at the root of the private repo (or adjust the cp paths).
-
-Outputs
-	•	daily_totals.csv — running table keyed by date (YYYY-MM-DD) with total and per‑instrument values
-	•	summaries/daily_summary-YYYY-MM-DD.html — styled HTML summary
-	•	summaries/latest.html — last run’s summary (overwritten each run)
-
-Troubleshooting
-
-SMTP auth fails / NoneType.encode or (334, 'Password:'):
-	•	Ensure env names match; main.py accepts either SMTP_* or EMAIL_ADDRESS/EMAIL_APP_PASSWORD/EMAIL_RECIPIENTS.
-	•	Use an App Password (Gmail/Outlook) and starttls() on port 587.
-
-Locale errors on GitHub Actions:
-	•	The code avoids locale.atof—prices are parsed by stripping £,$,p, and commas. No locale needed.
-
-USD/GBP/pence parsing:
-	•	Handled in code; p prices are converted to pounds, $ handled as USD with currency column and conversion if configured.
-
-Files not found when copying from the private repo:
-	•	Check the path; if your files are in a subfolder, update the cp commands accordingly.
-
-Security notes
-	•	Secrets are stored in GitHub Actions → Secrets.
-	•	For full historical scrubbing (if you ever committed data), use git filter-repo.
-
-License
-
-MIT
+License: MIT
