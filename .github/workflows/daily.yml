@@ -8,7 +8,9 @@ on:
 jobs:
   run-script:
     runs-on: ubuntu-latest
-
+    env:
+      LC_ALL: en_GB.UTF-8
+      LANG: en_GB.UTF-8
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
