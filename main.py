@@ -14,7 +14,13 @@ RECIPIENTS = [os.getenv('EMAIL_RECIPIENTS')]
 SMTP_SERVER=os.getenv('SMTP_HOST')
 SMTP_PORT=os.getenv('SMTP_PORT')
 EMAIL_TO=os.getenv('EMAIL_RECIPIENTS')
-      
+
+
+def assert_env():
+    missing = [n for n,v in {"SMTP_HOST":SMTP_SERVER, "SMTP_PORT":SMTP_PORT, "SMTP_USER":EMAIL_FROM,
+    "SMTP_PASS":APP_PASSWORD, "EMAIL_FROM":EMAIL_FROM, "EMAIL_TO":EMAIL_TO}.items() if not v]
+    if missing:
+        raise RuntimeError(f"Missing SMTP env vars: {', '.join(missing)}")
 
 def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
     # Convert index to column for display
