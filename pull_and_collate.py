@@ -1,15 +1,15 @@
 from price_scraper import price_scraper_fund
 import pandas as pd
-import locale
+import locale, random,time
+from forex_python.converter import CurrencyRates, RatesNotAvailableError
 
-import locale
 for loc in ('en_GB.UTF-8', 'en_US.UTF-8', 'C.UTF-8'):
     try:
         locale.setlocale(locale.LC_ALL, loc)
         break
     except locale.Error:
         continue
-from forex_python.converter import CurrencyRates
+
 
 def normalise_key(s: str) -> str:
     """Normalise a fund/title string for reliable matching."""
@@ -24,6 +24,23 @@ def normalise_key(s: str) -> str:
         .replace("  ", " ")
     )
 
+
+def get_usd_gbp_rate(retries=3, base_delay=1.0, max_delay=20.0):
+    c = CurrencyRates()
+    attempt = 0
+    while True:
+        try:
+            return c.get_rate('USD', 'GBP')
+        except RatesNotAvailableError as e:
+            attempt += 1
+            if attempt > retries:
+                print(f"[Error] Still failing after {retries} retries. Giving up.")
+                raise
+            delay = min(base_delay * (2 ** (attempt - 1)), max_delay)
+            jitter = random.uniform(0.9, 1.1)
+            delay *= jitter
+            print(f"[Retry {attempt}/{retries}] Rates not ready (likely upstream delay). Retrying in {delay:.1f} s…")
+            time.sleep(delay)
 
 
 def create_data_frame():
@@ -73,7 +90,7 @@ def create_data_frame():
     merged_data_df.loc[mask, cols_to_divide] = merged_data_df.loc[mask, cols_to_divide] / 100   
 
     
-    USD_GBP_Rate=CurrencyRates().get_rate('USD','GBP')
+    USD_GBP_Rate=get_usd_gbp_rate(retries=3,base_delay=2.0,max_delay=20.0)
     merged_data_df.loc[merged_data_df['currency'] == 'USD', 'value'] *= USD_GBP_Rate
     
     
