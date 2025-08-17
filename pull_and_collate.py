@@ -34,16 +34,17 @@ def get_usd_gbp_rate(retries=3, base_delay=1.0, max_delay=20.0):
             return c.get_rate('USD', 'GBP')
         except RatesNotAvailableError as e:
             attempt += 1
-            if attempt > retries:
-                print(f"[Error] Still failing after {retries} retries. Using Frankfurters")
-                resp=request.get('https://api.frankfurter.dev/v1/latest?base=USD&symbols=GBP')
-                data=resp.json()
-                return data["rates"]["GBP"] 
+            
             delay = min(base_delay * (2 ** (attempt - 1)), max_delay)
             jitter = random.uniform(0.9, 1.1)
             delay *= jitter
             print(f"[Retry {attempt}/{retries}] Rates not ready (likely upstream delay). Retrying in {delay:.1f} s…")
             time.sleep(delay)
+            if attempt > retries:
+                print(f"[Error] Still failing after {retries} retries. Using Frankfurters")
+                resp=request.get('https://api.frankfurter.dev/v1/latest?base=USD&symbols=GBP')
+                data=resp.json()
+                return data["rates"]["GBP"] 
 
 
 def create_data_frame():

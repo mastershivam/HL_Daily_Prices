@@ -6,7 +6,7 @@ from datetime import date
 def save_to_csv():
     data = create_data_frame()
     total = data['value'].sum()
-    print(total)
+    
 
     filename = 'daily_totals.csv'
     today_str = date.today().isoformat()
