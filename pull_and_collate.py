@@ -1,4 +1,4 @@
-from requests import request
+import requests
 from price_scraper import price_scraper_fund
 import pandas as pd
 import locale, random,time
@@ -42,8 +42,8 @@ def get_usd_gbp_rate(retries=3, base_delay=1.0, max_delay=20.0):
             time.sleep(delay)
             if attempt > retries:
                 print(f"[Error] Still failing after {retries} retries. Using Frankfurters")
-                resp=request.get('https://api.frankfurter.dev/v1/latest?base=USD&symbols=GBP')
-                data=resp.json()
+                
+                data=(requests.get('https://api.frankfurter.dev/v1/latest?base=USD&symbols=GBP')).json()
                 return data["rates"]["GBP"] 
 
 
