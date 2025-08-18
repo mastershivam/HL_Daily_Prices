@@ -32,5 +32,3 @@ def save_to_csv():
         df = pd.DataFrame([row_dict])
 
     df.to_csv(filename, index=False)
-
-save_to_csv()

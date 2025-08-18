@@ -32,8 +32,3 @@ def price_scraper_fund(url):
         "change_value": chg.group(1) if chg else None,
         "change_pct":   chg.group(2) if chg else None,
     }
-
-import re
-import requests
-from bs4 import BeautifulSoup
-

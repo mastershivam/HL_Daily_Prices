@@ -2,107 +2,19 @@ from pull_and_collate import create_data_frame
 import pandas as pd
 import os
 from datetime import date
-import smtplib
-from email.mime.text import MIMEText
+import locale
+from html_summary import build_html_summary
+from send_email import maybe_send_email
 
-from dotenv import load_dotenv
-
-def env(name):
-    v = os.getenv(name, "")
-    return v.strip() if isinstance(v, str) else v
-
-load_dotenv()
-# Map envs robustly: support both your local names and GitHub Secrets names
-SMTP_HOST = env('SMTP_HOST')
-SMTP_PORT = int(env('SMTP_PORT') or "587")
-SMTP_USER = env('SMTP_USER') or env('EMAIL_ADDRESS')          # login username
-SMTP_PASS = env('SMTP_PASS') or env('EMAIL_APP_PASSWORD')     # app password
-EMAIL_FROM = env('EMAIL_FROM') or SMTP_USER or env('EMAIL_ADDRESS')
-# Accept comma/space separated recipients
-_rcpts = env('EMAIL_TO') or env('EMAIL_RECIPIENTS')
-RECIPIENTS = [r.strip() for r in (_rcpts.split(',') if _rcpts else []) if r.strip()]
-
-
-
-def assert_env():
-    missing = [n for n, v in {
-        "SMTP_HOST": SMTP_HOST,
-        "SMTP_PORT": SMTP_PORT,
-        "SMTP_USER": SMTP_USER,
-        "SMTP_PASS": SMTP_PASS,
-        "EMAIL_FROM": EMAIL_FROM,
-    }.items() if not v]
-    if missing:
-        raise RuntimeError(f"Missing SMTP env vars: {', '.join(missing)}")
-
-def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
-    # Convert index to column for display
-    df_display = data.reset_index().rename(columns={"index": "Fund/Share"})
-    
-    # Format columns
-    if "value" in df_display.columns:
-        df_display["value"] = df_display["value"].apply(lambda v: f"£{v:,.2f}")
-    if "sell" in df_display.columns:
-        df_display["sell"] = df_display["sell"].fillna("").astype(str)
-
-    # HTML table
-    table_html = df_display.to_html(index=False, border=0, classes="dataframe", escape=False)
-    
-    html = f"""
-    <html>
-    <head>
-        <style>
-            body {{ font-family: Arial, sans-serif; }}
-            h1 {{ color: #333; }}
-            table.dataframe {{
-                border-collapse: collapse;
-                width: 100%;
-            }}
-            table.dataframe th, table.dataframe td {{
-                border: 1px solid #ddd;
-                padding: 8px;
-                text-align: left;
-            }}
-            table.dataframe th {{
-                background-color: #f2f2f2;
-            }}
-            tr:hover {{ background-color: #f9f9f9; }}
-        </style>
-    </head>
-    <body>
-        <h1>Daily Portfolio Summary — {today_str}</h1>
-        <h2>Total: £{total:,.2f}</h2>
-        {table_html}
-    </body>
-    </html>
-    """
-    return html
-
-def maybe_send_email(subject: str, html_body: str):
-    """
-    Send the summary via HTML email if SMTP vars are set.
-    Supports either:
-      - SMTP_* envs (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM, EMAIL_TO)
-      - GitHub secrets mapping (EMAIL_ADDRESS, EMAIL_APP_PASSWORD, EMAIL_RECIPIENTS)
-    """
-    assert_env()
-    if not RECIPIENTS:
-        # If no recipients provided, default to sending to the sender
-        RECIPIENTS.append(EMAIL_FROM)
-
-    msg = MIMEText(html_body, "html", "utf-8")
-    msg["Subject"] = subject
-    msg["From"] = EMAIL_FROM
-    msg["To"] = ", ".join(RECIPIENTS)
-
-    with smtplib.SMTP(SMTP_HOST, int(SMTP_PORT)) as s:
-        s.ehlo()
-        s.starttls()
-        s.ehlo()
-        s.login(SMTP_USER, SMTP_PASS)  # Use SMTP_USER/PASS for auth
-        s.send_message(msg)
 
 def main():
+    for loc in ('en_GB.UTF-8', 'en_US.UTF-8', 'C.UTF-8'):
+        try:
+            locale.setlocale(locale.LC_ALL, loc)
+            break
+        except locale.Error:
+            continue
+
     data = create_data_frame()
     print(data)
     total = data['Total Holding Value'].sum()
