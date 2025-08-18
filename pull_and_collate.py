@@ -42,7 +42,7 @@ def get_usd_gbp_rate(retries=3, base_delay=1.0, max_delay=20.0):
             time.sleep(delay)
             if attempt > retries:
                 print(f"[Error] Still failing after {retries} retries. Using Frankfurters")
-                
+
                 data=(requests.get('https://api.frankfurter.dev/v1/latest?base=USD&symbols=GBP')).json()
                 return data["rates"]["GBP"] 
 
@@ -94,7 +94,7 @@ def create_data_frame():
     merged_data_df.loc[mask, cols_to_divide] = merged_data_df.loc[mask, cols_to_divide] / 100   
 
     
-    USD_GBP_Rate=get_usd_gbp_rate(retries=3,base_delay=2.0,max_delay=20.0)
+    USD_GBP_Rate=get_usd_gbp_rate(retries=1,base_delay=2.0,max_delay=20.0)
     merged_data_df.loc[merged_data_df['currency'] == 'USD', 'value'] *= USD_GBP_Rate
     
     

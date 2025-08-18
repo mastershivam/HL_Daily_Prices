@@ -127,7 +127,9 @@ def main():
             df = pd.concat([df, pd.DataFrame([row_dict])], ignore_index=True)
     else:
         df = pd.DataFrame([row_dict])
-
+    df=df.drop('title')
+    rename_dict={'fund':'Fund','units':'Units','sell':'Sell Price','buy':'Buy Price','change_value':'Change Value','change_pct':'Percentage Change','url':'URL','currency':'Currency','value':'Total Holding Value'}
+    df=df.rename(rename_dict,axis=1)
     df.to_csv(filename, index=False)
 
     # --- HTML summary ---
