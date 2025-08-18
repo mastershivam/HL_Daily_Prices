@@ -6,12 +6,6 @@ import locale
 
 def create_data_frame():
     
-    with open("urls.txt", "r") as f:
-        urls = []
-        for line in f:
-            if line.strip():  # skip blank lines
-                urls.append(line.strip())  # add trimmed line to the list
-
     # Load units CSV and set index to normalised key of the fund name
     # Expected columns in units.csv: fund, units (and any others you need)
     units_df = pd.read_csv("units.csv")
@@ -22,6 +16,7 @@ def create_data_frame():
 
     # Pull scraped data and build a DataFrame indexed by the same normalized key
     temp_data = []
+    urls=units_df['url'].to_list()
     for url in urls:
         
         data = price_scraper_fund(url)  # should return dict with at least 'title'
@@ -56,8 +51,18 @@ def create_data_frame():
     merged_data_df.loc[usd_mask, 'value'] *= USD_GBP_Rate
     merged_data_df.loc[usd_mask, 'currency'] = 'GBP'
     
-    merged_data_df=merged_data_df.drop('title',axis=1)
-    rename_dict={'fund':'Fund','units':'Units','sell':'Sell Price','buy':'Buy Price','change_value':'Change Value','change_pct':'Percentage Change','url':'URL','currency':'Currency','value':'Total Holding Value'}
+    merged_data_df=merged_data_df.drop(['title','url_src'],axis=1)
+    
+    rename_dict={
+    'fund':'Fund',
+    'units':'Units',
+    'sell':'Sell Price',
+    'buy':'Buy Price',
+    'change_value':'Change Value',
+    'change_pct':'Percentage Change',
+    'url':'URL','currency':'Currency',
+    'value':'Total Holding Value'
+    }
     merged_data_df=merged_data_df.rename(rename_dict,axis=1)
     
     return merged_data_df
