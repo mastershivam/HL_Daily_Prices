@@ -3,3 +3,4 @@ python-dotenv
 requests
 beautifulsoup4
 forex_python
+numpy

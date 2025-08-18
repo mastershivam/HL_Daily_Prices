@@ -33,18 +33,19 @@ def get_usd_gbp_rate(retries=3, base_delay=1.0, max_delay=20.0):
         try:
             return c.get_rate('USD', 'GBP')
         except RatesNotAvailableError as e:
-            attempt += 1
             
-            delay = min(base_delay * (2 ** (attempt - 1)), max_delay)
+            
+            delay = min(base_delay * (2 ** (attempt)), max_delay)
             jitter = random.uniform(0.9, 1.1)
             delay *= jitter
             print(f"[Retry {attempt}/{retries}] Rates not ready (likely upstream delay). Retrying in {delay:.1f} s…")
             time.sleep(delay)
-            if attempt > retries:
+            if attempt >= retries:
                 print(f"[Error] Still failing after {retries} retries. Using Frankfurters")
 
                 data=(requests.get('https://api.frankfurter.dev/v1/latest?base=USD&symbols=GBP')).json()
                 return data["rates"]["GBP"] 
+            attempt += 1
 
 
 def create_data_frame():
@@ -95,8 +96,13 @@ def create_data_frame():
 
     
     USD_GBP_Rate=get_usd_gbp_rate(retries=1,base_delay=2.0,max_delay=20.0)
-    merged_data_df.loc[merged_data_df['currency'] == 'USD', 'value'] *= USD_GBP_Rate
+    usd_mask = merged_data_df['currency'] == 'USD'
+    merged_data_df.loc[usd_mask, 'value'] *= USD_GBP_Rate
+    merged_data_df.loc[usd_mask, 'currency'] = 'GBP'
     
+    merged_data_df=merged_data_df.drop('title',axis=1)
+    rename_dict={'fund':'Fund','units':'Units','sell':'Sell Price','buy':'Buy Price','change_value':'Change Value','change_pct':'Percentage Change','url':'URL','currency':'Currency','value':'Total Holding Value'}
+    merged_data_df=merged_data_df.rename(rename_dict,axis=1)
     
     return merged_data_df
 

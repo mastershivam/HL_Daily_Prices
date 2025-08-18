@@ -104,15 +104,16 @@ def maybe_send_email(subject: str, html_body: str):
 
 def main():
     data = create_data_frame()
-    total = data['value'].sum()
-    print(total)
+    print(data)
+    total = data['Total Holding Value'].sum()
+    
 
     filename = 'daily_totals.csv'
     today_str = date.today().isoformat()
 
     # Prepare row data for CSV
-    fund_values = data['value'].to_dict()
-    row_dict = {'date': today_str, 'total': total}
+    fund_values = data['Total Holding Value'].to_dict()
+    row_dict = {'Date': today_str, 'Total': total}
     row_dict.update(fund_values)
 
     if os.path.exists(filename):
@@ -120,16 +121,14 @@ def main():
         for fund in fund_values.keys():
             if fund not in df.columns:
                 df[fund] = pd.NA
-        if today_str in df['date'].values:
+        if today_str in df['Date'].values:
             for key, value in row_dict.items():
-                df.loc[df['date'] == today_str, key] = value
+                df.loc[df['Date'] == today_str, key] = value
         else:
             df = pd.concat([df, pd.DataFrame([row_dict])], ignore_index=True)
     else:
         df = pd.DataFrame([row_dict])
-    df=df.drop('title')
-    rename_dict={'fund':'Fund','units':'Units','sell':'Sell Price','buy':'Buy Price','change_value':'Change Value','change_pct':'Percentage Change','url':'URL','currency':'Currency','value':'Total Holding Value'}
-    df=df.rename(rename_dict,axis=1)
+    
     df.to_csv(filename, index=False)
 
     # --- HTML summary ---
