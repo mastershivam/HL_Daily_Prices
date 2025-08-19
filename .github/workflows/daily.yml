@@ -30,7 +30,6 @@ jobs:
         run: |
           git clone https://x-access-token:${GH_PAT}@github.com/mastershivam/HL_Daily_Prices_Data.git
           cp HL_Daily_Prices_Data/units.csv units.csv
-          cp HL_Daily_Prices_Data/urls.txt urls.txt
 
       - name: Run script
         env:
