@@ -54,7 +54,6 @@ def create_data_frame():
     merged_data_df=merged_data_df.drop(['title','url_src'],axis=1)
     
     rename_dict={
-    'fund':'Fund',
     'units':'Units',
     'sell':'Sell Price',
     'buy':'Buy Price',
@@ -64,6 +63,8 @@ def create_data_frame():
     'value':'Total Holding Value'
     }
     merged_data_df=merged_data_df.rename(rename_dict,axis=1)
+    merged_data_df.index.name='Fund/Share'
+
     
     return merged_data_df
 
