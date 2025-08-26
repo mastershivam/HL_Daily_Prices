@@ -66,25 +66,15 @@ def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
 
     # Build total badge safely (avoid complex f-string expressions)
     total_badge = f"Total: £{total:,.2f}"
-    # Before using total_class in the HTML, initialize it
-    total_class = "total flat"  # default
-
     if previous_total is not None:
         diff = total - previous_total
-        if diff > 0:
-            total_class = "total up"
-        elif diff < 0:
-            total_class = "total down"
-        else:
-            total_class = "total flat"
-        total_indicator = "▲" if diff > 0 else "▼" if diff < 0 else "•"
-        sign = "+" if diff >= 0 else ""
         pct = None if previous_total == 0 else ((diff / previous_total) * 100.0)
+        sign = "+" if diff >= 0 else ""
         pct_txt = f" ({'+' if (pct is not None and pct >= 0) else ''}{pct:.2f}%)" if pct is not None else ""
         total_badge = (
             f"Total: £{total:,.2f}  "
-            f"<span style=\"margin-left:8px; padding:4px 8px; border-radius:999px;\">"
-            f"{total_indicator}£{diff:,.2f}{pct_txt}</span>"
+            f"<span style=\"margin-left:8px; padding:4px 8px; border-radius:999px; background:#1f2937; color:#e5e7eb;\">"
+            f"{sign}£{diff:,.2f}{pct_txt}</span>"
         )
 
     html=f"""
@@ -98,9 +88,7 @@ def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
         .header {{ padding:22px 24px; border-bottom:1px solid #1f2937; }}
         .title {{ margin:0; font-size:24px; color:#f8fafc; }}
         .meta {{ margin-top:6px; font-size:13px; color:#94a3b8; }}
-        .total.flat {{ margin:16px 24px 0; background:#0ea5e9; color:#00131a; font-weight:800; display:inline-block; padding:10px 14px; border-radius:999px; !important;}}
-        .total.up {{ margin:16px 24px 0; background:#0ea5e9;  color:#22c55e; font-weight:800; display:inline-block; padding:10px 14px; border-radius:999px;!important; }}
-        .total.down {{ margin:16px 24px 0; background:#0ea5e9; color:#ef4444; font-weight:800; display:inline-block; padding:10px 14px; border-radius:999px; !important;}}        
+        .total {{ margin:16px 24px 0; background:#0ea5e9; color:#00131a; font-weight:800; display:inline-block; padding:10px 14px; border-radius:999px; }}
         .content {{ padding:20px 24px 28px; }}
         table.dataframe {{ border-collapse:collapse; width:100%; }}
         table.dataframe th, table.dataframe td {{ border:1px solid #374151; padding:10px; text-align:left; font-size:14px;  color:#fff; }}
@@ -116,7 +104,7 @@ def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
         <h1 class="title">Daily Portfolio Summary</h1>
         <div class="meta">{today_str}</div>
         </div>
-        <div class="{total_class}">{total_badge}</div>
+        <div class="total">{total_badge}</div>
         <div class="content">
         {table_html}
         </div>
