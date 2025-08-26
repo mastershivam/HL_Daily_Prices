@@ -83,7 +83,7 @@ def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
         pct_txt = f" ({'+' if (pct is not None and pct >= 0) else ''}{pct:.2f}%)" if pct is not None else ""
         total_badge = (
             f"Total: £{total:,.2f}  "
-            f"<span style=\"margin-left:8px; padding:4px 8px; border-radius:999px; color:#e5e7eb;\">"
+            f"<span style=\"margin-left:8px; padding:4px 8px; border-radius:999px;\">"
             f"{total_indicator}£{diff:,.2f}{pct_txt}</span>"
         )
 
