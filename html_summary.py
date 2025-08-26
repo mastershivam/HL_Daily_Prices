@@ -63,7 +63,19 @@ def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
         formatters["DoD %"] = lambda v: ("+" if v is not None and v >= 0 else "") + (f"{v:.2f}%" if v is not None else "")
 
     table_html = df_display.to_html(index=False, border=0, classes="dataframe", escape=False, formatters=formatters)
-    
+
+    # Build total badge safely (avoid complex f-string expressions)
+    total_badge = f"Total: £{total:,.2f}"
+    if previous_total is not None:
+        diff = total - previous_total
+        pct = None if previous_total == 0 else ((diff / previous_total) * 100.0)
+        sign = "+" if diff >= 0 else ""
+        pct_txt = f" ({'+' if (pct is not None and pct >= 0) else ''}{pct:.2f}%)" if pct is not None else ""
+        total_badge = (
+            f"Total: £{total:,.2f}  "
+            f"<span style=\"margin-left:8px; padding:4px 8px; border-radius:999px; background:#1f2937; color:#e5e7eb;\">"
+            f"{sign}£{diff:,.2f}{pct_txt}</span>"
+        )
 
     html=f"""
     <html>
@@ -92,13 +104,7 @@ def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
         <h1 class="title">Daily Portfolio Summary</h1>
         <div class="meta">{today_str}</div>
         </div>
-        <div class="total">{
-            (lambda t, pt: (
-                f"Total: £{t:,.2f}" if pt is None else
-                (lambda diff, pct: f"Total: £{t:,.2f}  <span style=\"margin-left:8px; padding:4px 8px; border-radius:999px; background:#1f2937; color:#e5e7eb;\">{('+' if diff >= 0 else '')}£{diff:,.2f}{(f' ({('+' if pct >= 0 else '')}{pct:.2f}%)' if pct is not None else '')}</span>")
-                )(t - pt, (None if pt == 0 else ((t - pt) / pt * 100.0)))
-            )
-        (total, previous_total)}</div>
+        <div class="total">{total_badge}</div>
         <div class="content">
         {table_html}
         </div>
