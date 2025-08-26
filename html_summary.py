@@ -1,17 +1,68 @@
+import os
 import pandas as pd
 
 def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
     # Convert index to column for display
     df_display = data.reset_index().rename(columns={"index": "Fund/Share"})
-    
-    # Format columns
-    if "value" in df_display.columns:
-        df_display["value"] = df_display["value"].apply(lambda v: f"£{v:,.2f}")
-    if "sell" in df_display.columns:
-        df_display["sell"] = df_display["sell"].fillna("").astype(str)
+
+    # Compute day-over-day using private repo history when available
+    previous_total = None
+    previous_by_fund = {}
+    try:
+        hist_path = os.path.join('HL_Daily_Prices_Data', 'outputs', 'daily_totals.csv')
+        if not os.path.exists(hist_path):
+            hist_path = 'daily_totals.csv'
+        if os.path.exists(hist_path):
+            hist_df = pd.read_csv(hist_path)
+            if 'Date' in hist_df.columns:
+                hist_df['Date'] = pd.to_datetime(hist_df['Date'])
+            today_dt = pd.to_datetime(today_str)
+            prev_df = hist_df[hist_df['Date'] < today_dt].sort_values('Date') if 'Date' in hist_df.columns else hist_df
+            if not prev_df.empty:
+                prev_row = prev_df.iloc[-1]
+                previous_total = float(prev_row.get('Total')) if 'Total' in prev_row else None
+                # Map per-instrument previous values using column names that match fund names
+                for fund_name in data.index.tolist():
+                    if fund_name in prev_row.index and pd.notna(prev_row.get(fund_name)):
+                        try:
+                            previous_by_fund[fund_name] = float(prev_row.get(fund_name))
+                        except Exception:
+                            continue
+    except Exception:
+        # Be resilient; if anything goes wrong, omit DoD info
+        previous_total = None
+        previous_by_fund = {}
+
+    # Attach DoD Change and DoD % to the display dataframe
+    dod_changes = []
+    dod_pcts = []
+    for fund_name, row in data.iterrows():
+        curr_val = float(row.get('Total Holding Value', 0.0))
+        prev_val = previous_by_fund.get(fund_name)
+        if prev_val is None:
+            dod_changes.append(None)
+            dod_pcts.append(None)
+        else:
+            chg = curr_val - prev_val
+            pct = (chg / prev_val * 100.0) if prev_val else None
+            dod_changes.append(chg)
+            dod_pcts.append(pct)
+    df_display['DoD Change'] = dod_changes
+    df_display['DoD %'] = dod_pcts
 
     # HTML table
-    table_html = df_display.to_html(index=False, border=0, classes="dataframe", escape=False)
+    # Format columns if present
+    formatters = {}
+    if "Total Holding Value" in df_display.columns:
+        formatters["Total Holding Value"] = lambda v: f"£{v:,.2f}" if pd.notna(v) else ""
+    if "Sell Price" in df_display.columns:
+        formatters["Sell Price"] = lambda v: f"£{v:,.2f}" if pd.notna(v) else ""
+    if "DoD Change" in df_display.columns:
+        formatters["DoD Change"] = lambda v: ("+" if v is not None and v >= 0 else "") + (f"£{v:,.2f}" if v is not None else "")
+    if "DoD %" in df_display.columns:
+        formatters["DoD %"] = lambda v: ("+" if v is not None and v >= 0 else "") + (f"{v:.2f}%" if v is not None else "")
+
+    table_html = df_display.to_html(index=False, border=0, classes="dataframe", escape=False, formatters=formatters)
     
 
     html=f"""
@@ -41,7 +92,13 @@ def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
         <h1 class="title">Daily Portfolio Summary</h1>
         <div class="meta">{today_str}</div>
         </div>
-        <div class="total">Total: £{total:,.2f}</div>
+        <div class="total">{
+            (lambda t, pt: (
+                f"Total: £{t:,.2f}" if pt is None else
+                (lambda diff, pct: f"Total: £{t:,.2f}  <span style=\"margin-left:8px; padding:4px 8px; border-radius:999px; background:#1f2937; color:#e5e7eb;\">{('+' if diff >= 0 else '')}£{diff:,.2f}{(f' ({('+' if pct >= 0 else '')}{pct:.2f}%)' if pct is not None else '')}</span>")
+                )(t - pt, (None if pt == 0 else ((t - pt) / pt * 100.0)))
+            )
+        (total, previous_total)}</div>
         <div class="content">
         {table_html}
         </div>
