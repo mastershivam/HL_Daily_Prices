@@ -90,20 +90,105 @@ def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
     <style>
         body {{ margin:0; padding:0; background:#0b1220; color:#e2e8f0; font-family:Arial,Helvetica,sans-serif; }}
         .container {{ width:100%; margin:0; background:#111827; box-shadow:0 2px 12px rgba(0,0,0,.25); overflow:hidden; border:1px solid #1f2937; }}
-        .header {{ padding:22px 24px; border-bottom:1px solid #1f2937; }}
-        .title {{ margin:0; font-size:24px; color:#f8fafc; }}
-        .meta {{ margin-top:6px; font-size:13px; color:#94a3b8; }}
-        .total {{ margin:16px 24px 0; background:#0ea5e9; color:#00131a; font-weight:800; display:inline-block; padding:10px 14px; border-radius:999px; }}
+        .header {{ padding:16px 20px; border-bottom:1px solid #1f2937; }}
+        .title {{ margin:0; font-size:20px; color:#f8fafc; }}
+        .meta {{ margin-top:6px; font-size:12px; color:#94a3b8; }}
+        .total {{ margin:12px 20px 0; background:#0ea5e9; color:#00131a; font-weight:800; display:inline-block; padding:8px 12px; border-radius:999px; font-size:14px; }}
         .total.up {{ background:#16a34a !important; }}
         .total.down {{ background:#dc2626 !important; }}
         .total.flat {{ background:#6b7280 !important; }}
-        .content {{ padding:20px 24px 28px; }}
-        table.dataframe {{ border-collapse:collapse; width:100%; }}
-        table.dataframe th, table.dataframe td {{ border:1px solid #374151; padding:10px; text-align:left; font-size:14px;  color:#fff; }}
-        table.dataframe thead th {{ background:#0f172a; color:#cbd5e1; border-bottom:2px solid #64748b; }}
+        .content {{ padding:16px 20px 24px; }}
+        
+        /* Mobile-first table styles */
+        table.dataframe {{ 
+            border-collapse:collapse; 
+            width:100%; 
+            font-size:12px;
+        }}
+        table.dataframe th, table.dataframe td {{ 
+            border:1px solid #374151; 
+            padding:8px 6px; 
+            text-align:left; 
+            color:#fff; 
+            word-wrap:break-word;
+            max-width:120px;
+        }}
+        table.dataframe thead th {{ 
+            background:#0f172a; 
+            color:#cbd5e1; 
+            border-bottom:2px solid #64748b; 
+            font-size:11px;
+        }}
         table.dataframe tbody tr:nth-child(odd) {{ background:#0b1324; }}
         a {{ color:#7dd3fc; }}
-        .footer {{ color:#64748b; font-size:12px; text-align:center; padding:14px; }}
+        .footer {{ color:#64748b; font-size:11px; text-align:center; padding:12px; }}
+        
+        /* Mobile-specific improvements */
+        @media (max-width: 768px) {{
+            .header {{ padding:12px 16px; }}
+            .title {{ font-size:18px; }}
+            .meta {{ font-size:11px; }}
+            .total {{ 
+                margin:10px 16px 0; 
+                padding:6px 10px; 
+                font-size:13px;
+                display:block;
+                text-align:center;
+            }}
+            .content {{ padding:12px 16px 20px; }}
+            
+            /* Make table scrollable horizontally on mobile */
+            .table-container {{
+                overflow-x:auto;
+                -webkit-overflow-scrolling:touch;
+                margin:0 -16px;
+                padding:0 16px;
+            }}
+            
+            table.dataframe {{
+                font-size:11px;
+                min-width:500px; /* Ensure minimum width for readability */
+            }}
+            
+            table.dataframe th, table.dataframe td {{
+                padding:6px 4px;
+                font-size:10px;
+            }}
+            
+            table.dataframe thead th {{
+                font-size:10px;
+            }}
+            
+            .footer {{
+                font-size:10px;
+                padding:10px;
+            }}
+        }}
+        
+        /* Extra small screens */
+        @media (max-width: 480px) {{
+            .header {{ padding:10px 12px; }}
+            .title {{ font-size:16px; }}
+            .total {{
+                margin:8px 12px 0;
+                padding:5px 8px;
+                font-size:12px;
+            }}
+            .content {{ padding:10px 12px 16px; }}
+            
+            table.dataframe {{
+                font-size:10px;
+            }}
+            
+            table.dataframe th, table.dataframe td {{
+                padding:4px 3px;
+                font-size:9px;
+            }}
+            
+            table.dataframe thead th {{
+                font-size:9px;
+            }}
+        }}
     </style>
     </head>
     <body>
@@ -114,7 +199,9 @@ def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
         </div>
         <div class="{total_class}">{total_badge}</div>
         <div class="content">
+        <div class="table-container">
         {table_html}
+        </div>
         </div>
         <div class="footer">Automatic message • HL Price Update</div>
     </div>
