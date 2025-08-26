@@ -98,9 +98,9 @@ def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
         .header {{ padding:22px 24px; border-bottom:1px solid #1f2937; }}
         .title {{ margin:0; font-size:24px; color:#f8fafc; }}
         .meta {{ margin-top:6px; font-size:13px; color:#94a3b8; }}
-        .total.flat {{ margin:16px 24px 0; background:#0ea5e9; color:#00131a; font-weight:800; display:inline-block; padding:10px 14px; border-radius:999px; }}
-        .total.up {{ margin:16px 24px 0; background:#0ea5e9;  color:#22c55e; font-weight:800; display:inline-block; padding:10px 14px; border-radius:999px; }}
-        .total.down {{ margin:16px 24px 0; background:#0ea5e9; color:#ef4444; font-weight:800; display:inline-block; padding:10px 14px; border-radius:999px; }}        
+        .total.flat {{ margin:16px 24px 0; background:#0ea5e9; color:#00131a; font-weight:800; display:inline-block; padding:10px 14px; border-radius:999px; !important;}}
+        .total.up {{ margin:16px 24px 0; background:#0ea5e9;  color:#22c55e; font-weight:800; display:inline-block; padding:10px 14px; border-radius:999px;!important; }}
+        .total.down {{ margin:16px 24px 0; background:#0ea5e9; color:#ef4444; font-weight:800; display:inline-block; padding:10px 14px; border-radius:999px; !important;}}        
         .content {{ padding:20px 24px 28px; }}
         table.dataframe {{ border-collapse:collapse; width:100%; }}
         table.dataframe th, table.dataframe td {{ border:1px solid #374151; padding:10px; text-align:left; font-size:14px;  color:#fff; }}
