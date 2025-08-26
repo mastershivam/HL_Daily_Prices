@@ -40,3 +40,34 @@ jobs:
           EMAIL_FROM: ${{ secrets.EMAIL_ADDRESS }}
           EMAIL_TO: ${{ secrets.EMAIL_RECIPIENTS}}
         run: python main.py
+
+      - name: Upload outputs as workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hl-daily-outputs-${{ github.run_id }}
+          path: |
+            daily_totals.csv
+            summaries/latest.html
+          if-no-files-found: warn
+
+      - name: Commit outputs back to private data repo
+        if: always()
+        env:
+          GH_PAT: ${{ secrets.DATA_REPO_TOKEN }}
+        run: |
+          set -e
+          cd HL_Daily_Prices_Data
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          mkdir -p outputs
+          cp ../daily_totals.csv outputs/daily_totals.csv
+          # Optionally keep latest HTML summary
+          mkdir -p outputs/summaries
+          if [ -f ../summaries/latest.html ]; then cp ../summaries/latest.html outputs/summaries/latest.html; fi
+          git add -f outputs/daily_totals.csv outputs/summaries/latest.html || true
+          if ! git diff --cached --quiet; then
+            git commit -m "Update outputs: daily_totals.csv and latest.html (run ${{ github.run_id }})"
+            git push origin HEAD
+          else
+            echo "No changes to commit in data repo"
+          fi
