@@ -66,20 +66,20 @@ def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
 
     # Build total badge safely (avoid complex f-string expressions)
     total_badge = f"Total: £{total:,.2f}"
+    # Before using total_class in the HTML, initialize it
+    total_class = "total flat"  # default
+
     if previous_total is not None:
         diff = total - previous_total
-        pct = None if previous_total == 0 else ((diff / previous_total) * 100.0)
-        if pct is not None:
-            if diff >0:
-                total_class = "total up"
-                total_indicator = "▲"
-            elif diff <0:
-                total_class = "total down"
-                total_indicator = "▼"
-            else:
-                total_class = "total flat"
-                total_indicator = "•"
+        if diff > 0:
+            total_class = "total up"
+        elif diff < 0:
+            total_class = "total down"
+        else:
+            total_class = "total flat"
+        total_indicator = "▲" if diff > 0 else "▼" if diff < 0 else "•"
         sign = "+" if diff >= 0 else ""
+        pct = None if previous_total == 0 else ((diff / previous_total) * 100.0)
         pct_txt = f" ({'+' if (pct is not None and pct >= 0) else ''}{pct:.2f}%)" if pct is not None else ""
         total_badge = (
             f"Total: £{total:,.2f}  "
@@ -116,7 +116,7 @@ def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
         <h1 class="title">Daily Portfolio Summary</h1>
         <div class="meta">{today_str}</div>
         </div>
-        <div class={total_class}>{total_badge}</div>
+        <div class="{total_class}">{total_badge}</div>
         <div class="content">
         {table_html}
         </div>
