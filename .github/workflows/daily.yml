@@ -31,6 +31,15 @@ jobs:
           git clone https://x-access-token:${GH_PAT}@github.com/mastershivam/HL_Daily_Prices_Data.git
           cp HL_Daily_Prices_Data/units.csv units.csv
 
+      - name: Seed existing history into workspace (if present)
+        run: |
+          if [ -f HL_Daily_Prices_Data/outputs/daily_totals.csv ]; then
+            cp HL_Daily_Prices_Data/outputs/daily_totals.csv daily_totals.csv
+            echo "Seeded local daily_totals.csv with history from data repo"
+          else
+            echo "No historical daily_totals.csv found in data repo; starting fresh"
+          fi
+
       - name: Run script
         env:
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
