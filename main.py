@@ -8,12 +8,16 @@ from send_email import maybe_send_email
 from pathlib import Path
 
 def main():
-    for loc in ('en_GB.UTF-8', 'en_US.UTF-8', 'C.UTF-8'):
+    # Try to set locale, but don't fail if it doesn't work
+    for loc in ('en_GB.UTF-8', 'en_US.UTF-8', 'C.UTF-8', 'C'):
         try:
             locale.setlocale(locale.LC_ALL, loc)
+            print(f"Locale set to: {loc}")
             break
         except locale.Error:
             continue
+    else:
+        print("Warning: Could not set locale, using system default")
 
     data = create_data_frame()
     print(data)
