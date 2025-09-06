@@ -2,13 +2,14 @@ from utilities import get_usd_gbp_rate, normalise_key
 from price_scraper import price_scraper_fund
 import pandas as pd
 import locale
-
+import os
 
 def create_data_frame():
     
     # Load units CSV and set index to normalised key of the fund name
     # Expected columns in units.csv: fund, units (and any others you need)
-    units_df = pd.read_csv("units.csv")
+    units_path = os.path.join('HL_Daily_Prices_Data', 'units.csv')
+    units_df = pd.read_csv(units_path)
     if "fund" not in units_df.columns:
         raise ValueError("units.csv must contain a 'fund' column for matching.")
     units_df["key"] = units_df["fund"].apply(normalise_key)
