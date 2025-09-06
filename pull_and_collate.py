@@ -49,6 +49,7 @@ def create_data_frame():
         try:
             print(f"Scraping {i+1}/{len(urls)}: {fund_name}")
             data = price_scraper_fund(url)  # should return dict with at least 'title'
+            print(data)
             if not isinstance(data, dict) or "title" not in data:
                 print(f"Warning: Failed to scrape {fund_name} - no title found")
                 continue

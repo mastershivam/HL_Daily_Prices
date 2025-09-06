@@ -220,3 +220,5 @@ __pycache__/pull_and_collate.cpython-39.pyc
 __pycache__/pull_and_collate.cpython-313.pyc
 
 !config/sample_*.csv
+
+test.py
