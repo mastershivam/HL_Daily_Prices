@@ -1,5 +1,4 @@
 
-import random,time
 import requests
 
 def get_usd_gbp_rate():
@@ -19,3 +18,23 @@ def normalise_key(s: str) -> str:
         .replace("&", " and ")
         .replace("  ", " ")
     )
+
+    # Improved normalization to handle common fund name variations
+def improved_normalise_key(s: str) -> str:
+    """Enhanced normalization for fund names to handle common variations."""
+    if s is None:
+        return ""
+    normalized = (
+        str(s)
+        .strip()
+        .casefold()
+        .replace(" & ", " and ")
+        .replace("&", " and ")
+        .replace("  ", " ")
+        .replace("indexaccumulation", "index accumulation")  # Fix the specific issue
+        .replace("indexdistribution", "index distribution")  # Handle similar cases
+        .replace("class a", "class a")
+        .replace("class b", "class b")
+        .replace("class c", "class c")
+    )
+    return normalized

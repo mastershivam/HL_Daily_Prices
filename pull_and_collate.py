@@ -1,4 +1,4 @@
-from utilities import get_usd_gbp_rate, normalise_key
+from utilities import get_usd_gbp_rate, improved_normalise_key
 from price_scraper import price_scraper_fund
 import pandas as pd
 import locale
@@ -37,7 +37,7 @@ def create_data_frame():
     print(f"Processing {len(units_df)} funds from units.csv")
     print("Funds:", units_df['fund'].tolist())
     
-    units_df["key"] = units_df["fund"].apply(normalise_key)
+    units_df["key"] = units_df["fund"].apply(improved_normalise_key)
     units_df = units_df.set_index("key")
 
     # Pull scraped data and build a DataFrame indexed by the same normalised key
@@ -53,7 +53,7 @@ def create_data_frame():
             if not isinstance(data, dict) or "title" not in data:
                 print(f"Warning: Failed to scrape {fund_name} - no title found")
                 continue
-            data["key"] = normalise_key(data["title"])
+            data["key"] = improved_normalise_key(data["title"])
             data["url"] = url
             data["fund_name"] = fund_name  # Keep original fund name for reference
             temp_data.append(data)
