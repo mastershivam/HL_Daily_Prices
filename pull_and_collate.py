@@ -4,7 +4,7 @@ import pandas as pd
 import locale
 import os
 
-def create_data_frame():
+def create_data_frame(debug=False):
     
     # Load units CSV and set index to normalised key of the fund name
     # Expected columns in units.csv: fund, units (and any others you need)
@@ -34,8 +34,9 @@ def create_data_frame():
     # Remove rows where required data is missing
     units_df = units_df.dropna(subset=['units', 'url'])
     
-    print(f"Processing {len(units_df)} funds from units.csv")
-    print("Funds:", units_df['fund'].tolist())
+    if debug:
+        print(f"Processing {len(units_df)} funds from units.csv")
+        print("Funds:", units_df['fund'].tolist())
     
     units_df["key"] = units_df["fund"].apply(improved_normalise_key)
     units_df = units_df.set_index("key")
@@ -47,9 +48,11 @@ def create_data_frame():
     
     for i, (url, fund_name) in enumerate(zip(urls, fund_names)):
         try:
-            print(f"Scraping {i+1}/{len(urls)}: {fund_name}")
+            if debug:
+                print(f"Scraping {i+1}/{len(urls)}: {fund_name}")
             data = price_scraper_fund(url)  # should return dict with at least 'title'
-            print(data)
+            if debug:
+                print(data)
             if not isinstance(data, dict) or "title" not in data:
                 print(f"Warning: Failed to scrape {fund_name} - no title found")
                 continue
@@ -57,7 +60,8 @@ def create_data_frame():
             data["url"] = url
             data["fund_name"] = fund_name  # Keep original fund name for reference
             temp_data.append(data)
-            print(f"Successfully scraped: {data['title']}")
+            if debug:
+                print(f"Successfully scraped: {data['title']}")
         except Exception as e:
             print(f"Error scraping {fund_name} ({url}): {str(e)}")
             continue
@@ -66,7 +70,8 @@ def create_data_frame():
         raise ValueError("No funds were successfully scraped. Check your URLs and network connection.")
 
     fund_data_df = pd.DataFrame(temp_data).set_index("key")
-    print(f"Successfully scraped {len(fund_data_df)} out of {len(units_df)} funds")
+    if debug:
+        print(f"Successfully scraped {len(fund_data_df)} out of {len(units_df)} funds")
 
     # Use left join to include all funds from units.csv, even if scraping failed
     merged_data_df = units_df.join(fund_data_df, how="left", rsuffix="_src")
@@ -87,7 +92,8 @@ def create_data_frame():
     if merged_data_df.empty:
         raise ValueError("No funds have valid scraped data. All scraping attempts failed.")
     
-    print(f"Processing {len(merged_data_df)} funds with valid data")
+    if debug:
+        print(f"Processing {len(merged_data_df)} funds with valid data")
         
     merged_data_df['currency'] = merged_data_df['sell'].str.contains('$', regex=False).map(lambda has_dollar: 'USD' if has_dollar else 'GBP')
     merged_data_df['sell'] = merged_data_df['sell'].str.replace('$', '', regex=False)

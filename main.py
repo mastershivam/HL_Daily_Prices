@@ -19,7 +19,10 @@ def main():
     else:
         print("Warning: Could not set locale, using system default")
 
-    data = create_data_frame()
+    # Check for debug mode via environment variable
+    debug_mode = os.getenv('DEBUG', 'false').lower() in ('true', '1', 'yes')
+    
+    data = create_data_frame(debug=debug_mode)
     print(data)
     total = data['Total Holding Value'].sum()
     
