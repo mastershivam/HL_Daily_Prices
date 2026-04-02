@@ -6,7 +6,7 @@ import os
 
 def create_data_frame(debug=False):
     
-    # Load units CSV and set index to normalised key of the fund name
+    # Load units CSV
     # Expected columns in units.csv: fund, units (and any others you need)
 
     units_path = os.path.join('HL_Daily_Prices_Data', 'units.csv')
@@ -39,9 +39,8 @@ def create_data_frame(debug=False):
         print("Funds:", units_df['fund'].tolist())
     
     units_df["key"] = units_df["fund"].apply(improved_normalise_key)
-    units_df = units_df.set_index("key")
 
-    # Pull scraped data and build a DataFrame indexed by the same normalised key
+    # Pull scraped data and build a DataFrame indexed by URL (stable join key)
     temp_data = []
     urls = units_df['url'].to_list()
     fund_names = units_df['fund'].to_list()
@@ -69,12 +68,12 @@ def create_data_frame(debug=False):
     if not temp_data:
         raise ValueError("No funds were successfully scraped. Check your URLs and network connection.")
 
-    fund_data_df = pd.DataFrame(temp_data).set_index("key")
+    fund_data_df = pd.DataFrame(temp_data).set_index("url")
     if debug:
         print(f"Successfully scraped {len(fund_data_df)} out of {len(units_df)} funds")
 
     # Use left join to include all funds from units.csv, even if scraping failed
-    merged_data_df = units_df.join(fund_data_df, how="left", rsuffix="_src")
+    merged_data_df = units_df.set_index("url").join(fund_data_df, how="left", rsuffix="_src")
 
     if "fund" in merged_data_df.columns:
         merged_data_df = merged_data_df.set_index("fund")
@@ -112,7 +111,7 @@ def create_data_frame(debug=False):
     merged_data_df.loc[usd_mask, 'value'] *= USD_GBP_Rate
     merged_data_df.loc[usd_mask, 'currency'] = 'GBP'
     
-    merged_data_df=merged_data_df.drop(['title','url_src'],axis=1)
+    merged_data_df=merged_data_df.drop(['title'],axis=1)
     
     rename_dict={
     'units':'Units',
@@ -128,4 +127,3 @@ def create_data_frame(debug=False):
 
     
     return merged_data_df
-

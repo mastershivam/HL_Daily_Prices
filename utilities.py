@@ -1,5 +1,6 @@
 
 import requests
+import re
 
 def get_usd_gbp_rate():
     data=(requests.get('https://api.frankfurter.dev/v1/latest?base=USD&symbols=GBP')).json()
@@ -37,4 +38,6 @@ def improved_normalise_key(s: str) -> str:
         .replace("class b", "class b")
         .replace("class c", "class c")
     )
+    # Fix missing spaces before "class" (e.g., "IndiaClass", "MarketsClass")
+    normalized = re.sub(r"([a-z])class", r"\1 class", normalized)
     return normalized
