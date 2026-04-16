@@ -1,90 +1,62 @@
-from pull_and_collate import create_data_frame
-import pandas as pd
-import os
 from datetime import date
+import logging
 import locale
+from pathlib import Path
+
+from config import get_debug_mode, get_email_settings, get_push_settings
 from html_summary import build_html_summary
-from history_summary import load_previous_snapshot
-from send_email import maybe_send_email
-from notifier import maybe_send_push
+from notifications import build_notification_subject, format_push_message, send_email_notification, send_push_notification
+from persistence import load_previous_snapshot, update_daily_totals
+from pull_and_collate import create_data_frame
 
 
-def format_push_message(total: float, previous_total: float | None) -> str:
-    message = f"Portfolio total: GBP {total:,.2f}"
-    if previous_total is None:
-        return message
+logger = logging.getLogger(__name__)
 
-    diff = total - previous_total
-    if previous_total == 0:
-        return f"{message} ({diff:+,.2f})"
 
-    pct = (diff / previous_total) * 100.0
-    return f"{message} ({diff:+,.2f}, {pct:+.2f}%)"
+def configure_logging(debug: bool) -> None:
+    level = logging.DEBUG if debug else logging.INFO
+    logging.basicConfig(level=level, format="%(levelname)s %(name)s: %(message)s")
 
-def main():
-    # Try to set locale, but don't fail if it doesn't work
-    for loc in ('en_GB.UTF-8', 'en_US.UTF-8', 'C.UTF-8', 'C'):
+
+def configure_locale() -> None:
+    for loc in ("en_GB.UTF-8", "en_US.UTF-8", "C.UTF-8", "C"):
         try:
             locale.setlocale(locale.LC_ALL, loc)
-            print(f"Locale set to: {loc}")
-            break
+            logger.debug("Locale set to %s", loc)
+            return
         except locale.Error:
             continue
-    else:
-        print("Warning: Could not set locale, using system default")
+    logger.warning("Could not set locale, using system default")
 
-    # Check for debug mode via environment variable
-    debug_mode = os.getenv('DEBUG', 'false').lower() in ('true', '1', 'yes')
-    
+
+def write_summary_files(html_summary: str, today_str: str, output_dir: str = "summaries") -> None:
+    out_dir = Path(output_dir)
+    out_dir.mkdir(exist_ok=True)
+    (out_dir / f"daily_summary-{today_str}.html").write_text(html_summary, encoding="utf-8")
+    (out_dir / "latest.html").write_text(html_summary, encoding="utf-8")
+
+
+def main() -> None:
+    debug_mode = get_debug_mode()
+    configure_logging(debug_mode)
+    configure_locale()
+
     data = create_data_frame(debug=debug_mode)
-    print(data)
-    total = data['Total Holding Value'].sum()
-    
-
-    filename = 'daily_totals.csv'
+    logger.debug("Final dataframe:\n%s", data)
+    total = float(data["Total Holding Value"].sum())
     today_str = date.today().isoformat()
 
-    # Prepare row data for CSV
-    fund_values = data['Total Holding Value'].to_dict()
-    row_dict = {'Date': today_str, 'Total': total}
-    row_dict.update(fund_values)
-
-    if os.path.exists(filename):
-        df = pd.read_csv(filename)
-        for fund in fund_values.keys():
-            if fund not in df.columns:
-                df[fund] = pd.NA
-        if today_str in df['Date'].values:
-            for key, value in row_dict.items():
-                df.loc[df['Date'] == today_str, key] = value
-        else:
-            df = pd.concat([df, pd.DataFrame([row_dict])], ignore_index=True)
-    else:
-        df = pd.DataFrame([row_dict])
-    
-    df.to_csv(filename, index=False)
-
-    # --- HTML summary ---
+    update_daily_totals(data, total, today_str)
     html_summary = build_html_summary(data, total, today_str)
-    
-    out_dir = "summaries"
-    os.makedirs(out_dir, exist_ok=True)
-    html_path = os.path.join(out_dir, f"daily_summary-{today_str}.html")
-    with open(html_path, "w", encoding="utf-8") as f:
-        f.write(html_summary)
+    write_summary_files(html_summary, today_str)
 
-    # Keep a rolling "latest" file too
-    with open(os.path.join(out_dir, "latest.html"), "w", encoding="utf-8") as f:
-        f.write(html_summary)
-    
-    
     previous_total, _ = load_previous_snapshot(today_str, data.index.tolist())
-
-    subject = f"Daily Portfolio Summary - {today_str}"
+    subject = build_notification_subject(today_str)
     push_message = format_push_message(total, previous_total)
-    maybe_send_push(subject, push_message)
-    maybe_send_email(subject, html_summary)
-    
-    
+
+    send_push_notification(get_push_settings(), subject, push_message)
+    send_email_notification(get_email_settings(), subject, html_summary)
+
+
 if __name__ == "__main__":
     main()

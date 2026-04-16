@@ -1,100 +1,106 @@
-# **HL Daily Prices**
+# HL Daily Prices
 
->Automates a daily portfolio snapshot using Hargreaves Lansdown (HL) prices.
->Combines your instrument list + units, computes values, saves CSV/HTML summaries, and (optionally) emails a neat daily report. Runs locally or on GitHub Actions.
+Automates a daily portfolio snapshot using Hargreaves Lansdown prices. It reads your holdings, scrapes current prices, computes portfolio values, stores a rolling history in `daily_totals.csv`, renders an HTML summary, and can notify you by push and optionally email.
 
-## Features:
-- Scrapes HL fund/share prices (handles £, $, and p formats)
-- Merges with your units & URLs
-- Computes per‑instrument value and total portfolio value
-- Saves daily_totals.csv and an HTML daily summary
-- Sends the summary via SMTP (Gmail/Outlook etc.)
-- Scheduled via GitHub Actions
-- Supports keeping data files private in a separate repo
+## Current behavior
 
-## How it works
+- `python main.py` is the main entrypoint.
+- The GitHub Actions workflow runs the same entrypoint on a schedule.
+- Holdings data is expected in `HL_Daily_Prices_Data/units.csv` when running in automation.
+- Outputs are written locally to:
+  - `daily_totals.csv`
+  - `summaries/daily_summary-YYYY-MM-DD.html`
+  - `summaries/latest.html`
 
-- pull_and_collate.py → create_data_frame() returns a DataFrame indexed by instrument name with columns like units, sell, value, …
-- main.py:
-	- builds today’s table and total
-	- writes/updates daily_totals.csv
-	- generates summaries/daily_summary-YYYY-MM-DD.html
-	- emails the HTML summary (if SMTP env vars are set)
+## Key files
 
-## Repo structure (key files)
+- `main.py` orchestrates the run.
+- `pull_and_collate.py` loads holdings, scrapes HL, and builds the portfolio DataFrame.
+- `persistence.py` updates daily history and loads prior snapshots.
+- `html_summary.py` builds the HTML report.
+- `notifications.py` formats and sends push/email notifications.
+- `.github/workflows/daily.yml` runs the scheduled job.
 
-├─ main.py                  # Entry point: build + save + email daily summary
+## Local setup
 
-├─ pull_and_collate.py      # Pricing + dataframe assembly
+1. Create and activate a virtual environment.
 
-├─ requirements.txt         # Runtime dependencies
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
 
-├─ .github/workflows/       # GitHub Actions workflow(s)
+2. Provide holdings data.
 
-├─ .gitignore               # Ignores data and generated files
+- Copy your private `units.csv` into `HL_Daily_Prices_Data/units.csv`, or adapt the path if you are running differently.
+- `sample_units.csv` is an example shape only.
 
-└─ summaries/               # (generated) Daily HTML summaries (gitignored)
+Expected columns in `units.csv`:
 
-Note: CSV/HTML/log files are gitignored so the public repo doesn’t leak data.
+- `fund`
+- `units`
+- `url`
 
-## **Setup (local)**
-1. Python env
+3. Optional notification config in `.env`.
 
-        python -m venv .venv
-        source .venv/bin/activate   # macOS/Linux
-        # .venv\Scripts\activate    # Windows
-        pip install -r requirements.txt
+Push via `ntfy`:
 
-2. Environment variables
-	Create a .env in the repo root (not committed) with one of the following sets:
+```env
+NTFY_BASE_URL=https://ntfy.sh
+NTFY_TOPIC=your_reserved_or_random_topic
+NTFY_TOKEN=your_token_if_required
+```
 
-	Generic SMTP
+Email via SMTP:
 
-        SMTP_HOST=smtp.gmail.com
-        SMTP_PORT=587
-        SMTP_USER=your_email@example.com
-        SMTP_PASS=your_app_password
-        EMAIL_FROM=your_email@example.com
-        EMAIL_TO=recipient1@example.com,recipient2@example.com
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@example.com
+SMTP_PASS=your_app_password
+EMAIL_FROM=your_email@example.com
+EMAIL_TO=recipient@example.com
+```
 
-	Alternate names (supported automatically)
+4. Run it.
 
-        EMAIL_ADDRESS=your_email@example.com
-        EMAIL_APP_PASSWORD=your_app_password
-        EMAIL_RECIPIENTS=recipient@example.com
+```bash
+python main.py
+```
 
-3. Run
+## Testing
 
-        python main.py
+Run the lightweight verification suite locally:
 
-### *Keep data files private (recommended)*
+```bash
+python -m py_compile main.py config.py persistence.py notifications.py pull_and_collate.py price_scraper.py html_summary.py
+pytest
+```
 
-- Put confidential files (e.g., units.csv, urls.csv) in a separate private repo, e.g. HL_Daily_Prices_Data.
-- Create a fine‑grained PAT with Contents: Read-only for that repo.
-- In your public repo’s workflow, clone the private repo at runtime and copy the files:
+The tests cover stable helpers only: history lookup, push formatting, price parsing, and deterministic transformation logic. They do not hit live network services.
 
-### *Outputs*
-- daily_totals.csv — running table keyed by date (YYYY-MM-DD) with total and per‑instrument values
-- summaries/daily_summary-YYYY-MM-DD.html — styled HTML summary
-- summaries/latest.html — last run’s summary (overwritten each run)
+## GitHub Actions
 
-### *Troubleshooting*
+The workflow in `.github/workflows/daily.yml`:
 
-*SMTP auth fails / NoneType.encode or (334, 'Password:'):*
-- Ensure env names match; main.py accepts either SMTP_* or EMAIL_ADDRESS/EMAIL_APP_PASSWORD/EMAIL_RECIPIENTS.
-- Use an App Password (Gmail/Outlook) and starttls() on port 587.
+- checks out this repo
+- installs dependencies
+- clones the private data repo
+- seeds prior `daily_totals.csv` history if available
+- runs `python main.py`
+- uploads outputs as artifacts
+- commits refreshed outputs back to the private data repo
 
-*Locale errors on GitHub Actions:*
-- The code avoids locale.atof—prices are parsed by stripping £,$,p, and commas. No locale needed.
+Required secrets for the current workflow:
 
-*USD/GBP/pence parsing:*
-- Handled in code; p prices are converted to pounds, $ handled as USD with currency column and conversion if configured.
+- `DATA_REPO_TOKEN`
+- `NTFY_TOPIC`
+- optional `NTFY_BASE_URL`
+- optional `NTFY_TOKEN`
 
-*Files not found when copying from the private repo:*
-- Check the path; if your files are in a subfolder, update the cp commands accordingly.
+## Notes
 
-*Security notes*
-- Secrets are stored in GitHub Actions → Secrets.
-- For full historical scrubbing (if you ever committed data), use git filter-repo.
-
-License: MIT
+- Generated outputs and local/private data are intentionally ignored by git.
+- If you use `ntfy.sh`, a reserved topic plus `NTFY_TOKEN` is the secure setup. A public guessable topic is not.
+- Email is optional. If SMTP settings are not present, email sending is skipped.

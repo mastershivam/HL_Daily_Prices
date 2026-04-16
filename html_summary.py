@@ -1,5 +1,5 @@
 import pandas as pd
-from history_summary import load_previous_snapshot
+from persistence import load_previous_snapshot
 
 def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
     # Convert index to column for display

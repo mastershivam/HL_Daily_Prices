@@ -1,129 +1,121 @@
-from utilities import get_usd_gbp_rate, improved_normalise_key
-from price_scraper import price_scraper_fund
+import logging
+from pathlib import Path
+
 import pandas as pd
-import locale
-import os
 
-def create_data_frame(debug=False):
-    
-    # Load units CSV
-    # Expected columns in units.csv: fund, units (and any others you need)
+from price_scraper import price_scraper_fund
+from utilities import convert_value_to_gbp, get_usd_gbp_rate, improved_normalise_key, infer_currency, parse_price_to_gbp
 
-    units_path = os.path.join('HL_Daily_Prices_Data', 'units.csv')
+
+logger = logging.getLogger(__name__)
+UNITS_PATH = Path("HL_Daily_Prices_Data") / "units.csv"
+
+
+def load_units_dataframe(units_path: Path = UNITS_PATH) -> pd.DataFrame:
     units_df = pd.read_csv(units_path)
-    
-    # Remove empty rows (where all values are NaN)
-    units_df = units_df.dropna(how='all')
-    
+    units_df = units_df.dropna(how="all")
+
     if "fund" not in units_df.columns:
         raise ValueError("units.csv must contain a 'fund' column for matching.")
-    
-    # Remove rows where fund name is missing
-    units_df = units_df.dropna(subset=['fund'])
-    
-    # Check for missing required columns
-    missing_columns = []
-    if 'units' not in units_df.columns:
-        missing_columns.append('units')
-    if 'url' not in units_df.columns:
-        missing_columns.append('url')
-    
+
+    missing_columns = [column for column in ("units", "url") if column not in units_df.columns]
     if missing_columns:
         raise ValueError(f"units.csv is missing required columns: {', '.join(missing_columns)}")
-    
-    # Remove rows where required data is missing
-    units_df = units_df.dropna(subset=['units', 'url'])
-    
-    if debug:
-        print(f"Processing {len(units_df)} funds from units.csv")
-        print("Funds:", units_df['fund'].tolist())
-    
-    units_df["key"] = units_df["fund"].apply(improved_normalise_key)
 
-    # Pull scraped data and build a DataFrame indexed by URL (stable join key)
-    temp_data = []
-    urls = units_df['url'].to_list()
-    fund_names = units_df['fund'].to_list()
-    
-    for i, (url, fund_name) in enumerate(zip(urls, fund_names)):
+    units_df = units_df.dropna(subset=["fund", "units", "url"]).copy()
+    units_df["key"] = units_df["fund"].apply(improved_normalise_key)
+    return units_df
+
+
+def scrape_fund_rows(units_df: pd.DataFrame, debug: bool = False) -> list[dict[str, object]]:
+    temp_data: list[dict[str, object]] = []
+
+    if debug:
+        logger.debug("Processing %s funds from units.csv", len(units_df))
+        logger.debug("Funds: %s", units_df["fund"].tolist())
+
+    for index, row in units_df.iterrows():
+        fund_name = row["fund"]
+        url = row["url"]
         try:
             if debug:
-                print(f"Scraping {i+1}/{len(urls)}: {fund_name}")
-            data = price_scraper_fund(url)  # should return dict with at least 'title'
+                logger.debug("Scraping %s/%s: %s", index + 1, len(units_df), fund_name)
+            data = price_scraper_fund(url)
             if debug:
-                print(data)
-            if not isinstance(data, dict) or "title" not in data:
-                print(f"Warning: Failed to scrape {fund_name} - no title found")
+                logger.debug("Scrape result for %s: %s", fund_name, data)
+            if not isinstance(data, dict) or "title" not in data or not data["title"]:
+                logger.warning("Failed to scrape %s - no title found", fund_name)
                 continue
             data["key"] = improved_normalise_key(data["title"])
             data["url"] = url
-            data["fund_name"] = fund_name  # Keep original fund name for reference
+            data["fund_name"] = fund_name
             temp_data.append(data)
-            if debug:
-                print(f"Successfully scraped: {data['title']}")
-        except Exception as e:
-            print(f"Error scraping {fund_name} ({url}): {str(e)}")
+        except Exception as exc:
+            logger.warning("Error scraping %s (%s): %s", fund_name, url, exc)
             continue
 
     if not temp_data:
         raise ValueError("No funds were successfully scraped. Check your URLs and network connection.")
 
-    fund_data_df = pd.DataFrame(temp_data).set_index("url")
     if debug:
-        print(f"Successfully scraped {len(fund_data_df)} out of {len(units_df)} funds")
+        logger.debug("Successfully scraped %s out of %s funds", len(temp_data), len(units_df))
 
-    # Use left join to include all funds from units.csv, even if scraping failed
+    return temp_data
+
+
+def normalise_merged_dataframe(merged_data_df: pd.DataFrame) -> pd.DataFrame:
+    merged_data_df = merged_data_df.copy()
+    merged_data_df["currency"] = merged_data_df["sell"].map(infer_currency)
+    share_mask = merged_data_df.index.str.contains("share", case=False)
+    merged_data_df["sell"] = [
+        parse_price_to_gbp(price, is_share=is_share)
+        for price, is_share in zip(merged_data_df["sell"], share_mask)
+    ]
+    merged_data_df["value"] = merged_data_df["units"] * merged_data_df["sell"]
+
+    usd_gbp_rate = get_usd_gbp_rate()
+    merged_data_df["value"] = [
+        convert_value_to_gbp(value, currency, usd_gbp_rate)
+        for value, currency in zip(merged_data_df["value"], merged_data_df["currency"])
+    ]
+    merged_data_df.loc[merged_data_df["currency"] == "USD", "currency"] = "GBP"
+
+    return merged_data_df.drop(columns=["title"])
+
+
+def create_data_frame(debug: bool = False) -> pd.DataFrame:
+    units_df = load_units_dataframe()
+    scraped_rows = scrape_fund_rows(units_df, debug=debug)
+
+    fund_data_df = pd.DataFrame(scraped_rows).set_index("url")
     merged_data_df = units_df.set_index("url").join(fund_data_df, how="left", rsuffix="_src")
 
     if "fund" in merged_data_df.columns:
         merged_data_df = merged_data_df.set_index("fund")
 
-    # Check for funds that failed to scrape
-    failed_funds = merged_data_df[merged_data_df['title'].isna()]
+    failed_funds = merged_data_df[merged_data_df["title"].isna()]
     if not failed_funds.empty:
-        print(f"Warning: {len(failed_funds)} funds failed to scrape and will be excluded:")
+        logger.warning("%s funds failed to scrape and will be excluded", len(failed_funds))
         for fund in failed_funds.index:
-            print(f"  - {fund}")
-    
-    # Remove funds that failed to scrape (have NaN values for required fields)
-    merged_data_df = merged_data_df.dropna(subset=['title', 'sell'])
-    
+            logger.warning("Excluded fund: %s", fund)
+
+    merged_data_df = merged_data_df.dropna(subset=["title", "sell"])
     if merged_data_df.empty:
         raise ValueError("No funds have valid scraped data. All scraping attempts failed.")
-    
-    if debug:
-        print(f"Processing {len(merged_data_df)} funds with valid data")
-        
-    merged_data_df['currency'] = merged_data_df['sell'].str.contains('$', regex=False).map(lambda has_dollar: 'USD' if has_dollar else 'GBP')
-    merged_data_df['sell'] = merged_data_df['sell'].str.replace('$', '', regex=False)
-    merged_data_df['sell']=(merged_data_df['sell'].map(lambda value: locale.atof(value[:-1])))
-    merged_data_df.astype({'sell': 'complex128'}).dtypes
-    
-    merged_data_df['value']=(merged_data_df['units']*merged_data_df['sell'])
 
-    cols_to_divide = ["sell", "value"]
-    mask = ~merged_data_df.index.str.contains("share", case=False)
-    merged_data_df.loc[mask, cols_to_divide] = merged_data_df.loc[mask, cols_to_divide] / 100   
-
-    
-    USD_GBP_Rate=get_usd_gbp_rate()
-    usd_mask = merged_data_df['currency'] == 'USD'
-    merged_data_df.loc[usd_mask, 'value'] *= USD_GBP_Rate
-    merged_data_df.loc[usd_mask, 'currency'] = 'GBP'
-    
-    merged_data_df=merged_data_df.drop(['title'],axis=1)
-    
-    rename_dict={
-    'units':'Units',
-    'sell':'Sell Price',
-    'buy':'Buy Price',
-    'change_value':'Change Value',
-    'change_pct':'Percentage Change',
-    'url':'URL','currency':'Currency',
-    'value':'Total Holding Value'
-    }
-    merged_data_df=merged_data_df.rename(rename_dict,axis=1)
-    merged_data_df.index.name='Fund/Share'
-
-    
+    merged_data_df = normalise_merged_dataframe(merged_data_df)
+    merged_data_df = merged_data_df.rename(
+        {
+            "units": "Units",
+            "sell": "Sell Price",
+            "buy": "Buy Price",
+            "change_value": "Change Value",
+            "change_pct": "Percentage Change",
+            "url": "URL",
+            "currency": "Currency",
+            "value": "Total Holding Value",
+        },
+        axis=1,
+    )
+    merged_data_df.index.name = "Fund/Share"
     return merged_data_df

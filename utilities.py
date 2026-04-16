@@ -1,43 +1,51 @@
-
-import requests
+import logging
 import re
 
-def get_usd_gbp_rate():
-    data=(requests.get('https://api.frankfurter.dev/v1/latest?base=USD&symbols=GBP')).json()
-    return data["rates"]["GBP"] 
-            
+import requests
 
-def normalise_key(s: str) -> str:
-    """Normalise a fund/title string for reliable matching."""
-    if s is None:
-        return ""
-    return (
-        str(s)
-        .strip()
-        .casefold()
-        .replace(" & ", " and ")
-        .replace("&", " and ")
-        .replace("  ", " ")
+
+logger = logging.getLogger(__name__)
+
+
+def get_usd_gbp_rate() -> float:
+    response = requests.get(
+        "https://api.frankfurter.dev/v1/latest?base=USD&symbols=GBP",
+        timeout=20,
     )
+    response.raise_for_status()
+    data = response.json()
+    return float(data["rates"]["GBP"])
 
-    # Improved normalization to handle common fund name variations
-def improved_normalise_key(s: str) -> str:
-    """Enhanced normalization for fund names to handle common variations."""
-    if s is None:
+
+def improved_normalise_key(value: str) -> str:
+    if value is None:
         return ""
     normalized = (
-        str(s)
+        str(value)
         .strip()
         .casefold()
         .replace(" & ", " and ")
         .replace("&", " and ")
         .replace("  ", " ")
-        .replace("indexaccumulation", "index accumulation")  # Fix the specific issue
-        .replace("indexdistribution", "index distribution")  # Handle similar cases
-        .replace("class a", "class a")
-        .replace("class b", "class b")
-        .replace("class c", "class c")
+        .replace("indexaccumulation", "index accumulation")
+        .replace("indexdistribution", "index distribution")
     )
-    # Fix missing spaces before "class" (e.g., "IndiaClass", "MarketsClass")
-    normalized = re.sub(r"([a-z])class", r"\1 class", normalized)
-    return normalized
+    return re.sub(r"([a-z])class", r"\1 class", normalized)
+
+
+def parse_price_to_gbp(value: str, is_share: bool) -> float:
+    cleaned = str(value).replace(",", "").replace("£", "").replace("$", "").strip()
+    if cleaned.endswith("p"):
+        cleaned = cleaned[:-1]
+    amount = float(cleaned)
+    return amount if is_share else amount / 100.0
+
+
+def infer_currency(value: str) -> str:
+    return "USD" if "$" in str(value) else "GBP"
+
+
+def convert_value_to_gbp(value: float, currency: str, usd_gbp_rate: float) -> float:
+    if currency == "USD":
+        return value * usd_gbp_rate
+    return value
