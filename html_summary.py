@@ -1,37 +1,12 @@
-import os
 import pandas as pd
+from history_summary import load_previous_snapshot
 
 def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
     # Convert index to column for display
     df_display = data.reset_index().rename(columns={"index": "Fund/Share"})
 
     # Compute day-over-day using private repo history when available
-    previous_total = None
-    previous_by_fund = {}
-    try:
-        hist_path = os.path.join('HL_Daily_Prices_Data', 'outputs', 'daily_totals.csv')
-        if not os.path.exists(hist_path):
-            hist_path = 'daily_totals.csv'
-        if os.path.exists(hist_path):
-            hist_df = pd.read_csv(hist_path)
-            if 'Date' in hist_df.columns:
-                hist_df['Date'] = pd.to_datetime(hist_df['Date'])
-            today_dt = pd.to_datetime(today_str)
-            prev_df = hist_df[hist_df['Date'] < today_dt].sort_values('Date') if 'Date' in hist_df.columns else hist_df
-            if not prev_df.empty:
-                prev_row = prev_df.iloc[-1]
-                previous_total = float(prev_row.get('Total')) if 'Total' in prev_row else None
-                # Map per-instrument previous values using column names that match fund names
-                for fund_name in data.index.tolist():
-                    if fund_name in prev_row.index and pd.notna(prev_row.get(fund_name)):
-                        try:
-                            previous_by_fund[fund_name] = float(prev_row.get(fund_name))
-                        except Exception:
-                            continue
-    except Exception:
-        # Be resilient; if anything goes wrong, omit DoD info
-        previous_total = None
-        previous_by_fund = {}
+    previous_total, previous_by_fund = load_previous_snapshot(today_str, data.index.tolist())
 
     # Attach DoD Change and DoD % to the display dataframe
     dod_changes = []

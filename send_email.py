@@ -37,6 +37,9 @@ def maybe_send_email(subject: str, html_body: str):
       - SMTP_* envs (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM, EMAIL_TO)
       - GitHub secrets mapping (EMAIL_ADDRESS, EMAIL_APP_PASSWORD, EMAIL_RECIPIENTS)
     """
+    if not any([SMTP_HOST, SMTP_USER, SMTP_PASS, EMAIL_FROM, RECIPIENTS]):
+        return
+
     assert_env()
     if not RECIPIENTS:
         # If no recipients provided, default to sending to the sender

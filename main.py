@@ -1,11 +1,25 @@
 from pull_and_collate import create_data_frame
 import pandas as pd
-import os,json
+import os
 from datetime import date
 import locale
 from html_summary import build_html_summary
+from history_summary import load_previous_snapshot
 from send_email import maybe_send_email
-from pathlib import Path
+from notifier import maybe_send_push
+
+
+def format_push_message(total: float, previous_total: float | None) -> str:
+    message = f"Portfolio total: GBP {total:,.2f}"
+    if previous_total is None:
+        return message
+
+    diff = total - previous_total
+    if previous_total == 0:
+        return f"{message} ({diff:+,.2f})"
+
+    pct = (diff / previous_total) * 100.0
+    return f"{message} ({diff:+,.2f}, {pct:+.2f}%)"
 
 def main():
     # Try to set locale, but don't fail if it doesn't work
@@ -64,7 +78,11 @@ def main():
         f.write(html_summary)
     
     
-    subject = f"Daily Portfolio Summary — {today_str}"
+    previous_total, _ = load_previous_snapshot(today_str, data.index.tolist())
+
+    subject = f"Daily Portfolio Summary - {today_str}"
+    push_message = format_push_message(total, previous_total)
+    maybe_send_push(subject, push_message)
     maybe_send_email(subject, html_summary)
     
     
