@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from email.mime.text import MIMEText
 import logging
 import smtplib
@@ -14,17 +16,36 @@ def build_notification_subject(today_str: str) -> str:
     return f"Daily Portfolio Summary - {today_str}"
 
 
-def format_push_message(total: float, previous_total: float | None) -> str:
+def format_push_message(
+    total: float,
+    previous_total: float | None,
+    elix_price_pence: float | None = None,
+    elix_change_pence: float | None = None,
+    elix_change_pct: float | None = None,
+) -> str:
     message = f"Portfolio total: GBP {total:,.2f}"
     if previous_total is None:
-        return message
+        base_message = message
+    else:
+        diff = total - previous_total
+        if previous_total == 0:
+            base_message = f"{message} ({diff:+,.2f})"
+        else:
+            pct = (diff / previous_total) * 100.0
+            base_message = f"{message} ({diff:+,.2f}, {pct:+.2f}%)"
 
-    diff = total - previous_total
-    if previous_total == 0:
-        return f"{message} ({diff:+,.2f})"
+    if elix_price_pence is None:
+        return base_message
 
-    pct = (diff / previous_total) * 100.0
-    return f"{message} ({diff:+,.2f}, {pct:+.2f}%)"
+    change_text = ""
+    if elix_change_pence is not None:
+        change_text = f" ({elix_change_pence:+.2f}p DoD"
+        if elix_change_pct is not None:
+            change_text += f", {elix_change_pct:+.2f}%"
+        change_text += ")"
+    elif elix_change_pct is not None:
+        change_text = f" ({elix_change_pct:+.2f}% DoD)"
+    return f"{base_message}\nLON:ELIX: {elix_price_pence:.2f}p{change_text}"
 
 
 def send_push_notification(settings: PushSettings, subject: str, message: str, click_url: str | None = None) -> None:

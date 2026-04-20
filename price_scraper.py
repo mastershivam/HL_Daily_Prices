@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 import requests
 from bs4 import BeautifulSoup
@@ -41,3 +43,31 @@ def parse_fund_html(html: str) -> dict[str, str | None]:
 
 def price_scraper_fund(url: str) -> dict[str, str | None]:
     return parse_fund_html(fetch_fund_html(url))
+
+
+def fetch_google_finance_quote(exchange: str, ticker: str) -> dict[str, str | float]:
+    symbol = f"{ticker}:{exchange}"
+    url = f"https://www.google.com/finance/quote/{ticker}:{exchange}"
+    response = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
+    response.raise_for_status()
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    text = soup.get_text(" ", strip=True)
+    normalized_text = re.sub(r"\s+", " ", text)
+
+    price_match = re.search(rf"{re.escape(symbol)}\s*([0-9]+(?:\.[0-9]+)?)", normalized_text)
+    change_match = re.search(r"([+\-][0-9]+(?:\.[0-9]+)?)\s*\(([+\-][0-9]+(?:\.[0-9]+)?)%\)", normalized_text)
+
+    if not price_match:
+        raise ValueError(f"Could not parse latest price for {symbol}")
+
+    price = float(price_match.group(1))
+    change_value = float(change_match.group(1)) if change_match else None
+    change_pct = float(change_match.group(2)) if change_match else None
+
+    return {
+        "symbol": symbol,
+        "price_pence": price,
+        "change_pence": change_value,
+        "change_pct": change_pct,
+    }

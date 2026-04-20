@@ -1,7 +1,16 @@
+from __future__ import annotations
+
 import pandas as pd
 from persistence import load_previous_snapshot
 
-def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
+def build_html_summary(
+    data: pd.DataFrame,
+    total: float,
+    today_str: str,
+    elix_price_pence: float | None = None,
+    elix_change_pence: float | None = None,
+    elix_change_pct: float | None = None,
+) -> str:
     # Convert index to column for display
     df_display = data.reset_index().rename(columns={"index": "Fund/Share"})
 
@@ -57,6 +66,18 @@ def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
         elif diff < 0:
             total_class = "total down"
 
+    elix_badge = ""
+    if elix_price_pence is not None:
+        elix_change = ""
+        if elix_change_pence is not None:
+            elix_change = f" ({elix_change_pence:+.2f}p DoD"
+            if elix_change_pct is not None:
+                elix_change += f", {elix_change_pct:+.2f}%"
+            elix_change += ")"
+        elif elix_change_pct is not None:
+            elix_change = f" ({elix_change_pct:+.2f}% DoD)"
+        elix_badge = f'<div class="elix">LON:ELIX: {elix_price_pence:.2f}p{elix_change}</div>'
+
     html=f"""
     <html>
     <head>
@@ -73,6 +94,7 @@ def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
         .total.down {{ background:#dc2626 !important; }}
         .total.flat {{ background:#6b7280 !important; }}
         .content {{ padding:16px 20px 24px; }}
+        .elix {{ margin:12px 20px 0; background:#1d4ed8; color:#dbeafe; font-weight:700; display:inline-block; padding:8px 12px; border-radius:999px; font-size:14px; }}
         
         /* Mobile-first table styles */
         table.dataframe {{ 
@@ -111,6 +133,13 @@ def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
                 text-align:center;
             }}
             .content {{ padding:12px 16px 20px; }}
+            .elix {{
+                margin:10px 16px 0;
+                padding:6px 10px;
+                font-size:13px;
+                display:block;
+                text-align:center;
+            }}
             
             /* Make table scrollable horizontally on mobile */
             .table-container {{
@@ -150,6 +179,11 @@ def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
                 font-size:12px;
             }}
             .content {{ padding:10px 12px 16px; }}
+            .elix {{
+                margin:8px 12px 0;
+                padding:5px 8px;
+                font-size:12px;
+            }}
             
             table.dataframe {{
                 font-size:10px;
@@ -173,6 +207,7 @@ def build_html_summary(data: pd.DataFrame, total: float, today_str: str) -> str:
         <div class="meta">{today_str}</div>
         </div>
         <div class="{total_class}">{total_badge}</div>
+        {elix_badge}
         <div class="content">
         <div class="table-container">
         {table_html}
