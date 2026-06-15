@@ -15,7 +15,7 @@ def test_load_previous_snapshot_uses_latest_prior_row(tmp_path, monkeypatch):
         ]
     ).to_csv(history_path, index=False)
 
-    monkeypatch.setattr(persistence, "PRIVATE_HISTORY_PATH", tmp_path / "missing.csv")
+    monkeypatch.setattr(persistence, "PRIVATE_HISTORY_PATH", tmp_path / "private" / "daily_totals.csv")
     monkeypatch.setattr(persistence, "DEFAULT_HISTORY_PATH", history_path)
 
     previous_total, previous_by_fund = persistence.load_previous_snapshot("2026-04-16", ["Fund A"])
@@ -24,7 +24,7 @@ def test_load_previous_snapshot_uses_latest_prior_row(tmp_path, monkeypatch):
 
 
 def test_load_previous_snapshot_returns_empty_when_history_missing(tmp_path, monkeypatch):
-    monkeypatch.setattr(persistence, "PRIVATE_HISTORY_PATH", tmp_path / "missing-private.csv")
+    monkeypatch.setattr(persistence, "PRIVATE_HISTORY_PATH", tmp_path / "private" / "missing-private.csv")
     monkeypatch.setattr(persistence, "DEFAULT_HISTORY_PATH", tmp_path / "missing-local.csv")
 
     previous_total, previous_by_fund = persistence.load_previous_snapshot("2026-04-16", ["Fund A"])
@@ -36,7 +36,7 @@ def test_load_previous_snapshot_handles_malformed_history(tmp_path, monkeypatch)
     history_path = tmp_path / "daily_totals.csv"
     history_path.write_text("not,a,valid,csv\n1,2", encoding="utf-8")
 
-    monkeypatch.setattr(persistence, "PRIVATE_HISTORY_PATH", tmp_path / "missing-private.csv")
+    monkeypatch.setattr(persistence, "PRIVATE_HISTORY_PATH", tmp_path / "private" / "missing-private.csv")
     monkeypatch.setattr(persistence, "DEFAULT_HISTORY_PATH", history_path)
 
     previous_total, previous_by_fund = persistence.load_previous_snapshot("2026-04-16", ["Fund A"])

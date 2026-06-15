@@ -8,7 +8,10 @@ PRIVATE_HISTORY_PATH = Path("HL_Daily_Prices_Data") / "outputs" / "daily_totals.
 
 
 def resolve_history_path() -> Path:
-    if PRIVATE_HISTORY_PATH.exists():
+    # Prefer the private data-repo location whenever that directory is present,
+    # so reads and writes always target the same file (including the first run,
+    # before the history file itself exists).
+    if PRIVATE_HISTORY_PATH.parent.exists():
         return PRIVATE_HISTORY_PATH
     return DEFAULT_HISTORY_PATH
 
@@ -46,12 +49,13 @@ def load_previous_snapshot(today_str: str, fund_names: list[str]) -> tuple[float
     return previous_total, previous_by_fund
 
 
-def update_daily_totals(data: pd.DataFrame, total: float, today_str: str, filename: str = "daily_totals.csv") -> pd.DataFrame:
+def update_daily_totals(data: pd.DataFrame, total: float, today_str: str, filename: str | None = None) -> pd.DataFrame:
     fund_values = data["Total Holding Value"].to_dict()
     row_dict = {"Date": today_str, "Total": total}
     row_dict.update(fund_values)
 
-    path = Path(filename)
+    path = Path(filename) if filename is not None else resolve_history_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         history_df = pd.read_csv(path)
         for fund in fund_values:

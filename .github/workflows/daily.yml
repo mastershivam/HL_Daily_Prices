@@ -30,16 +30,8 @@ jobs:
           GH_PAT: ${{ secrets.DATA_REPO_TOKEN }}
         run: |
           git clone https://x-access-token:${GH_PAT}@github.com/mastershivam/HL_Daily_Prices_Data.git
-          cp HL_Daily_Prices_Data/units.csv units.csv
-
-      - name: Seed existing history into workspace (if present)
-        run: |
-          if [ -f HL_Daily_Prices_Data/outputs/daily_totals.csv ]; then
-            cp HL_Daily_Prices_Data/outputs/daily_totals.csv daily_totals.csv
-            echo "Seeded local daily_totals.csv with history from data repo"
-          else
-            echo "No historical daily_totals.csv found in data repo; starting fresh"
-          fi
+          # Ensure the outputs dir exists so the app reads/writes history in place
+          mkdir -p HL_Daily_Prices_Data/outputs
 
       - name: Run script
         env:
@@ -53,7 +45,7 @@ jobs:
         with:
           name: hl-daily-outputs-${{ github.run_id }}
           path: |
-            daily_totals.csv
+            HL_Daily_Prices_Data/outputs/daily_totals.csv
             summaries/latest.html
           if-no-files-found: warn
 
@@ -66,9 +58,7 @@ jobs:
           cd HL_Daily_Prices_Data
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
-          mkdir -p outputs
-          cp ../daily_totals.csv outputs/daily_totals.csv
-          # Optionally keep latest HTML summary
+          # daily_totals.csv is already written in place under outputs/ by the app
           mkdir -p outputs/summaries
           if [ -f ../summaries/latest.html ]; then cp ../summaries/latest.html outputs/summaries/latest.html; fi
           git add -f outputs/daily_totals.csv outputs/summaries/latest.html || true
