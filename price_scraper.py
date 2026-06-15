@@ -45,29 +45,38 @@ def price_scraper_fund(url: str) -> dict[str, str | None]:
     return parse_fund_html(fetch_fund_html(url))
 
 
-def fetch_google_finance_quote(exchange: str, ticker: str) -> dict[str, str | float]:
-    symbol = f"{ticker}:{exchange}"
-    url = f"https://www.google.com/finance/quote/{ticker}:{exchange}"
-    response = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
-    response.raise_for_status()
+def fetch_share_quote(yahoo_symbol: str) -> dict[str, str | float | None]:
+    """Fetch a listed share quote via yfinance, normalised to pence.
 
-    soup = BeautifulSoup(response.text, "html.parser")
-    text = soup.get_text(" ", strip=True)
-    normalized_text = re.sub(r"\s+", " ", text)
+    LSE quotes are usually reported in GBp (pence); a feed reporting GBP
+    (pounds) is scaled up by 100 so the rest of the app can assume pence.
+    yfinance is imported lazily so the rest of the module stays usable
+    (and testable) without the dependency installed.
+    """
+    import yfinance as yf
 
-    price_match = re.search(rf"{re.escape(symbol)}\s*([0-9]+(?:\.[0-9]+)?)", normalized_text)
-    change_match = re.search(r"([+\-][0-9]+(?:\.[0-9]+)?)\s*\(([+\-][0-9]+(?:\.[0-9]+)?)%\)", normalized_text)
+    fast_info = yf.Ticker(yahoo_symbol).fast_info
+    last_price = fast_info.get("lastPrice")
+    previous_close = fast_info.get("previousClose")
+    currency = fast_info.get("currency") or ""
 
-    if not price_match:
-        raise ValueError(f"Could not parse latest price for {symbol}")
+    if last_price is None:
+        raise ValueError(f"Could not fetch latest price for {yahoo_symbol}")
 
-    price = float(price_match.group(1))
-    change_value = float(change_match.group(1)) if change_match else None
-    change_pct = float(change_match.group(2)) if change_match else None
+    scale = 100.0 if currency == "GBP" else 1.0  # GBp/GBX are already pence
+    price_pence = float(last_price) * scale
+
+    change_pence = None
+    change_pct = None
+    if previous_close:
+        previous_pence = float(previous_close) * scale
+        change_pence = price_pence - previous_pence
+        if previous_pence:
+            change_pct = (change_pence / previous_pence) * 100.0
 
     return {
-        "symbol": symbol,
-        "price_pence": price,
-        "change_pence": change_value,
+        "symbol": yahoo_symbol,
+        "price_pence": price_pence,
+        "change_pence": change_pence,
         "change_pct": change_pct,
     }

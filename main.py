@@ -9,7 +9,7 @@ from config import get_debug_mode, get_email_settings, get_push_settings
 from html_summary import build_html_summary
 from notifications import build_notification_subject, format_push_message, send_email_notification, send_push_notification
 from persistence import load_previous_snapshot, update_daily_totals
-from price_scraper import fetch_google_finance_quote
+from price_scraper import fetch_share_quote
 from pull_and_collate import create_data_frame
 
 
@@ -50,12 +50,12 @@ def main() -> None:
     today_str = date.today().isoformat()
 
     update_daily_totals(data, total, today_str)
-    previous_total, _ = load_previous_snapshot(today_str, data.index.tolist())
+    previous_total, previous_by_fund = load_previous_snapshot(today_str, data.index.tolist())
     elix_price_pence = None
     elix_change_pence = None
     elix_change_pct = None
     try:
-        elix_quote = fetch_google_finance_quote(exchange="LON", ticker="ELIX")
+        elix_quote = fetch_share_quote("ELIX.L")
         elix_price_pence = float(elix_quote["price_pence"])
         if elix_quote["change_pence"] is not None:
             elix_change_pence = float(elix_quote["change_pence"])
@@ -68,6 +68,8 @@ def main() -> None:
         data,
         total,
         today_str,
+        previous_total=previous_total,
+        previous_by_fund=previous_by_fund,
         elix_price_pence=elix_price_pence,
         elix_change_pence=elix_change_pence,
         elix_change_pct=elix_change_pct,
