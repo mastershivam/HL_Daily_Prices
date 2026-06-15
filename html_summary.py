@@ -7,6 +7,8 @@ def build_html_summary(
     data: pd.DataFrame,
     total: float,
     today_str: str,
+    previous_total: float | None = None,
+    previous_by_fund: dict[str, float] | None = None,
     elix_price_pence: float | None = None,
     elix_change_pence: float | None = None,
     elix_change_pct: float | None = None,
@@ -14,8 +16,12 @@ def build_html_summary(
     # Convert index to column for display
     df_display = data.reset_index().rename(columns={"index": "Fund/Share"})
 
-    # Compute day-over-day using private repo history when available
-    previous_total, previous_by_fund = load_previous_snapshot(today_str, data.index.tolist())
+    # Day-over-day comparison: use the snapshot passed in by the caller, and
+    # only fall back to loading it ourselves when neither value was provided.
+    if previous_total is None and previous_by_fund is None:
+        previous_total, previous_by_fund = load_previous_snapshot(today_str, data.index.tolist())
+    if previous_by_fund is None:
+        previous_by_fund = {}
 
     # Attach DoD Change and DoD % to the display dataframe
     dod_changes = []
