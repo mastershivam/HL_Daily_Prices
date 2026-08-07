@@ -4,17 +4,22 @@ import re
 import requests
 from bs4 import BeautifulSoup
 
+from utilities import with_retries
+
 
 def fetch_fund_html(url: str) -> str:
-    response = requests.get(url, timeout=20)
-    response.raise_for_status()
-    return response.text
+    def _fetch() -> str:
+        response = requests.get(url, timeout=20)
+        response.raise_for_status()
+        return response.text
+
+    return with_retries(_fetch, retries=2, backoff=1.0, exceptions=(requests.RequestException,))
 
 
 def parse_fund_html(html: str) -> dict[str, str | None]:
     soup = BeautifulSoup(html, "html.parser")
 
-    price_pattern = r"([$£]?[0-9,]+\.\d{2}p?)"
+    price_pattern = r"([$£€]?[0-9,]+\.\d{2}p?)"
     text = soup.get_text(" ", strip=True)
 
     sell = re.search(rf"Sell:\s*{price_pattern}", text)
@@ -55,19 +60,26 @@ def fetch_share_quote(yahoo_symbol: str) -> dict[str, str | float | None]:
     """
     import yfinance as yf
 
-    fast_info = yf.Ticker(yahoo_symbol).fast_info
-    last_price = fast_info.get("lastPrice")
-    previous_close = fast_info.get("previousClose")
-    currency = fast_info.get("currency") or ""
+    def _fetch() -> dict:
+        fast_info = yf.Ticker(yahoo_symbol).fast_info
+        last_price = fast_info.get("lastPrice")
+        if last_price is None:
+            raise ValueError(f"Could not fetch latest price for {yahoo_symbol}")
+        return {
+            "last_price": last_price,
+            "previous_close": fast_info.get("previousClose"),
+            "currency": fast_info.get("currency") or "",
+        }
 
-    if last_price is None:
-        raise ValueError(f"Could not fetch latest price for {yahoo_symbol}")
+    fetched = with_retries(_fetch, retries=2, backoff=1.0, exceptions=(Exception,))
 
+    currency = fetched["currency"]
     scale = 100.0 if currency == "GBP" else 1.0  # GBp/GBX are already pence
-    price_pence = float(last_price) * scale
+    price_pence = float(fetched["last_price"]) * scale
 
     change_pence = None
     change_pct = None
+    previous_close = fetched["previous_close"]
     if previous_close:
         previous_pence = float(previous_close) * scale
         change_pence = price_pence - previous_pence

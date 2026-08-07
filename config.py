@@ -70,3 +70,16 @@ def get_push_settings() -> PushSettings:
 
 def get_debug_mode() -> bool:
     return env_flag("DEBUG", default=False)
+
+
+def get_watchlist_tickers() -> tuple[str, ...]:
+    """Yahoo Finance symbols to show as reference quotes alongside the
+    portfolio total (not counted in the total itself). Previously this was
+    a single ticker ("ELIX.L") hardcoded in main.py; it's now a
+    comma-separated WATCHLIST_TICKERS env var, defaulting to the same
+    ticker so existing behaviour is unchanged if it's left unset.
+    """
+    raw = env("WATCHLIST_TICKERS")
+    if not raw:
+        return ("ELIX.L",)
+    return tuple(t.strip() for t in raw.split(",") if t.strip())

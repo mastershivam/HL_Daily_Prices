@@ -49,6 +49,24 @@ def load_previous_snapshot(today_str: str, fund_names: list[str]) -> tuple[float
     return previous_total, previous_by_fund
 
 
+def load_history_totals(limit: int = 30) -> list[float]:
+    """Return up to the last `limit` portfolio totals in date order, for
+    rendering a trend sparkline. Returns [] if there's no usable history."""
+    path = resolve_history_path()
+    if not path.exists():
+        return []
+    try:
+        history_df = pd.read_csv(path)
+        if "Date" not in history_df.columns or "Total" not in history_df.columns:
+            return []
+        history_df["Date"] = pd.to_datetime(history_df["Date"], errors="coerce")
+        history_df = history_df.dropna(subset=["Date"]).sort_values("Date")
+        totals = pd.to_numeric(history_df["Total"], errors="coerce").dropna()
+        return [float(v) for v in totals.tail(limit).tolist()]
+    except Exception:
+        return []
+
+
 def update_daily_totals(data: pd.DataFrame, total: float, today_str: str, filename: str | None = None) -> pd.DataFrame:
     fund_values = data["Total Holding Value"].to_dict()
     row_dict = {"Date": today_str, "Total": total}

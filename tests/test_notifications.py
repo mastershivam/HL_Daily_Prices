@@ -37,3 +37,24 @@ def test_format_push_message_with_elix_quote_without_change():
 def test_format_push_message_with_elix_quote_and_only_pct_change():
     message = format_push_message(12345.67, None, elix_price_pence=152.5, elix_change_pct=-0.45)
     assert message == "Portfolio total: GBP 12,345.67\nLON:ELIX: 152.50p (-0.45% DoD)"
+
+
+def test_format_push_message_with_multiple_watchlist_quotes():
+    message = format_push_message(
+        12345.67,
+        None,
+        watchlist_quotes=[
+            {"symbol": "ELIX.L", "price_pence": 152.5, "change_pence": 1.5, "change_pct": 1.23},
+            {"symbol": "VOD.L", "price_pence": 75.0, "change_pence": None, "change_pct": -0.2},
+        ],
+    )
+    assert message == (
+        "Portfolio total: GBP 12,345.67\n"
+        "LON:ELIX.L: 152.50p (+1.50p DoD, +1.23%)\n"
+        "LON:VOD.L: 75.00p (-0.20% DoD)"
+    )
+
+
+def test_format_push_message_notes_failed_funds():
+    message = format_push_message(12345.67, None, failed_funds=["Fund A", "Fund B"])
+    assert message == "Portfolio total: GBP 12,345.67\n⚠ Could not price 2 holding(s): Fund A, Fund B"

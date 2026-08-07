@@ -44,6 +44,30 @@ def test_load_previous_snapshot_handles_malformed_history(tmp_path, monkeypatch)
     assert previous_by_fund == {}
 
 
+def test_load_history_totals_returns_recent_totals_in_date_order(tmp_path, monkeypatch):
+    history_path = tmp_path / "daily_totals.csv"
+    pd.DataFrame(
+        [
+            {"Date": "2026-04-16", "Total": 120.0},
+            {"Date": "2026-04-14", "Total": 100.0},
+            {"Date": "2026-04-15", "Total": 110.0},
+        ]
+    ).to_csv(history_path, index=False)
+
+    monkeypatch.setattr(persistence, "PRIVATE_HISTORY_PATH", tmp_path / "private" / "daily_totals.csv")
+    monkeypatch.setattr(persistence, "DEFAULT_HISTORY_PATH", history_path)
+
+    assert persistence.load_history_totals() == [100.0, 110.0, 120.0]
+    assert persistence.load_history_totals(limit=2) == [110.0, 120.0]
+
+
+def test_load_history_totals_returns_empty_list_when_missing(tmp_path, monkeypatch):
+    monkeypatch.setattr(persistence, "PRIVATE_HISTORY_PATH", tmp_path / "private" / "missing.csv")
+    monkeypatch.setattr(persistence, "DEFAULT_HISTORY_PATH", tmp_path / "missing-local.csv")
+
+    assert persistence.load_history_totals() == []
+
+
 def test_update_daily_totals_writes_and_updates_history(tmp_path):
     history_path = tmp_path / "daily_totals.csv"
     data = pd.DataFrame({"Total Holding Value": [10.0, 20.0]}, index=["Fund A", "Fund B"])

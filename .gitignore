@@ -27,6 +27,7 @@ summaries/
 *.log
 
 units.csv
+transactions.csv
 urls.txt
 HL_Daily_Prices_Data/
 

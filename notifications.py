@@ -16,12 +16,31 @@ def build_notification_subject(today_str: str) -> str:
     return f"Daily Portfolio Summary - {today_str}"
 
 
+def _format_watchlist_line(quote: dict) -> str:
+    symbol = quote.get("symbol")
+    price_pence = quote.get("price_pence")
+    change_pence = quote.get("change_pence")
+    change_pct = quote.get("change_pct")
+
+    change_text = ""
+    if change_pence is not None:
+        change_text = f" ({change_pence:+.2f}p DoD"
+        if change_pct is not None:
+            change_text += f", {change_pct:+.2f}%"
+        change_text += ")"
+    elif change_pct is not None:
+        change_text = f" ({change_pct:+.2f}% DoD)"
+    return f"LON:{symbol}: {price_pence:.2f}p{change_text}"
+
+
 def format_push_message(
     total: float,
     previous_total: float | None,
     elix_price_pence: float | None = None,
     elix_change_pence: float | None = None,
     elix_change_pct: float | None = None,
+    watchlist_quotes: list[dict] | None = None,
+    failed_funds: list[str] | None = None,
 ) -> str:
     message = f"Portfolio total: GBP {total:,.2f}"
     if previous_total is None:
@@ -34,18 +53,26 @@ def format_push_message(
             pct = (diff / previous_total) * 100.0
             base_message = f"{message} ({diff:+,.2f}, {pct:+.2f}%)"
 
-    if elix_price_pence is None:
-        return base_message
+    lines = [base_message]
 
-    change_text = ""
-    if elix_change_pence is not None:
-        change_text = f" ({elix_change_pence:+.2f}p DoD"
-        if elix_change_pct is not None:
-            change_text += f", {elix_change_pct:+.2f}%"
-        change_text += ")"
-    elif elix_change_pct is not None:
-        change_text = f" ({elix_change_pct:+.2f}% DoD)"
-    return f"{base_message}\nLON:ELIX: {elix_price_pence:.2f}p{change_text}"
+    # Back-compat: a caller can still pass the old single-ticker params.
+    quotes = list(watchlist_quotes) if watchlist_quotes else []
+    if not quotes and elix_price_pence is not None:
+        quotes = [
+            {
+                "symbol": "ELIX",
+                "price_pence": elix_price_pence,
+                "change_pence": elix_change_pence,
+                "change_pct": elix_change_pct,
+            }
+        ]
+    for quote in quotes:
+        lines.append(_format_watchlist_line(quote))
+
+    if failed_funds:
+        lines.append(f"⚠ Could not price {len(failed_funds)} holding(s): {', '.join(failed_funds)}")
+
+    return "\n".join(lines)
 
 
 def send_push_notification(settings: PushSettings, subject: str, message: str, click_url: str | None = None) -> None:
