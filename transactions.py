@@ -155,6 +155,63 @@ def sync_units_csv_from_transactions(
     return out_df
 
 
+def reconcile_holdings(screenshot_holdings: dict[str, float], units_path: Path | None = None) -> pd.DataFrame:
+    """Compare OCR'd screenshot holdings against the current units.csv
+    position. Returns the proposed per-fund changes for review - this never
+    writes anything itself, so a bad OCR read can be caught before it
+    touches your data."""
+    units_path = units_path or resolve_units_path()
+    current = pd.read_csv(units_path) if units_path.exists() else pd.DataFrame(columns=["fund", "units", "url", "type"])
+    current_units = dict(zip(current["fund"], current["units"]))
+
+    rows = [
+        {
+            "fund": fund,
+            "current_units": float(current_units.get(fund, 0.0)),
+            "screenshot_units": screenshot_units,
+            "delta": round(screenshot_units - float(current_units.get(fund, 0.0)), 4),
+        }
+        for fund, screenshot_units in screenshot_holdings.items()
+    ]
+    return pd.DataFrame(rows, columns=["fund", "current_units", "screenshot_units", "delta"])
+
+
+def apply_reconciliation(
+    changes: pd.DataFrame,
+    note: str = "reconciled from holdings screenshot (OCR)",
+    txn_date: str | None = None,
+    units_path: Path | None = None,
+) -> list[str]:
+    """Append a transaction for every non-zero delta in `changes` (as
+    produced by reconcile_holdings) and rebuild units.csv from the result.
+
+    Price/amount are deliberately left unknown: OCR gives us a units figure,
+    not what was actually paid, so cost-basis tracking for these top-ups is
+    marked unknown rather than guessed. Use `invest.py "Fund" --amount ...`
+    instead for a transaction where you want accurate cost-basis tracking.
+    """
+    units_path = units_path or resolve_units_path()
+    existing = pd.read_csv(units_path) if units_path.exists() else pd.DataFrame(columns=["fund", "url"])
+    url_by_fund = dict(zip(existing["fund"], existing["url"])) if "url" in existing.columns else {}
+
+    applied = []
+    for _, row in changes.iterrows():
+        if abs(row["delta"]) < 1e-6:
+            continue
+        append_transaction(
+            fund=row["fund"],
+            url=url_by_fund.get(row["fund"]),
+            units=row["delta"],
+            txn_date=txn_date,
+            note=note,
+        )
+        applied.append(row["fund"])
+
+    if applied:
+        sync_units_csv_from_transactions(units_path=units_path)
+    return applied
+
+
 def seed_transactions_from_units(
     units_path: Path | None = None,
     transactions_path: Path | None = None,

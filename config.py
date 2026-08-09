@@ -25,9 +25,15 @@ class EmailSettings:
     password: str
     sender: str
     recipients: tuple[str, ...]
+    email_enabled: bool = True
 
     @property
     def enabled(self) -> bool:
+        # EMAIL_ENABLED is an explicit kill switch, separate from whether
+        # SMTP credentials happen to be present - so email can be turned
+        # off without deleting/losing the SMTP config for later.
+        if not self.email_enabled:
+            return False
         return any([self.host, self.user, self.password, self.sender, self.recipients])
 
 
@@ -57,6 +63,7 @@ def get_email_settings() -> EmailSettings:
         password=password,
         sender=sender,
         recipients=recipients,
+        email_enabled=env_flag("EMAIL_ENABLED", default=True),
     )
 
 

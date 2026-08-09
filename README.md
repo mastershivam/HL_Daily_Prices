@@ -37,6 +37,18 @@ python invest.py "Baillie Gifford Japanese" --units 12.34 --price 40.52
 
 Both append a transaction to `transactions.csv` and regenerate `units.csv` automatically. The fund must already have a row in `units.csv` so `invest.py` knows which URL/ticker to price it against.
 
+### Syncing from a screenshot instead
+
+If you'd rather not type `invest.py "Fund" --amount ...` every time, take a screenshot of your HL holdings page and run:
+
+```bash
+python invest.py --sync-from-image holdings.png
+```
+
+This reads fund names and unit counts off the image with local OCR (`pytesseract` + the system `tesseract` binary - install with e.g. `brew install tesseract` on macOS), fuzzy-matches them against the funds already in `units.csv`, and prints a preview of what would change. Nothing is written until you add `--apply`. Funds it can't confidently match in the screenshot are left untouched rather than guessed.
+
+This never logs into HL, scrapes your authenticated account, or stores any HL credentials - it only reads whatever image file you give it, entirely locally (no Claude/cloud call at sync time either). The trade-off: because it's reading units off a screenshot rather than a contract note, it doesn't know what you paid, so cost basis for any top-up found this way is left unknown - use `--amount`/`--units` instead when you want that top-up's P&L tracked.
+
 ### Renaming a fund
 
 Don't edit the fund name directly in `units.csv` - it silently orphans that fund's `daily_totals.csv` history column (a new column starts under the new name, the old one just stops updating). Use:
@@ -58,6 +70,7 @@ Separately, `WATCHLIST_TICKERS` (comma-separated Yahoo symbols, in `.env` or as 
 - `main.py` orchestrates the run and sends a failure push notification if anything throws.
 - `pull_and_collate.py` loads holdings, scrapes HL/yfinance, and builds the portfolio DataFrame. Validates `units.csv` (no duplicate funds, no zero/negative units, valid `type` values) and returns which funds failed to price.
 - `transactions.py` / `invest.py` / `rename_fund.py` - the investment tracking workflow described above.
+- `holdings_ocr.py` - local OCR parsing used by `invest.py --sync-from-image`.
 - `persistence.py` updates daily history, loads prior snapshots, and loads recent totals for the sparkline.
 - `html_summary.py` builds the HTML report (total, DoD change, unrealised P&L, watchlist quotes, failed-fund warnings, trend sparkline).
 - `notifications.py` formats and sends push/email notifications.
@@ -124,7 +137,7 @@ python main.py
 Run the lightweight verification suite locally:
 
 ```bash
-python -m py_compile main.py config.py persistence.py notifications.py pull_and_collate.py price_scraper.py html_summary.py utilities.py transactions.py invest.py rename_fund.py
+python -m py_compile main.py config.py persistence.py notifications.py pull_and_collate.py price_scraper.py html_summary.py utilities.py transactions.py invest.py rename_fund.py holdings_ocr.py
 pytest
 ```
 
@@ -154,7 +167,7 @@ Required secrets for the current workflow:
 
 - Generated outputs and local/private data are intentionally ignored by git.
 - If you use `ntfy.sh`, a reserved topic plus `NTFY_TOKEN` is the secure setup. A public guessable topic is not.
-- Email is optional. If SMTP settings are not present, email sending is skipped.
+- Email is optional. If SMTP settings are not present, email sending is skipped. Set `EMAIL_ENABLED=false` in `.env` to turn it off explicitly without deleting the SMTP config (flip it back to `true`, or remove the line, to re-enable).
 - Network calls (HL scraping, yfinance, FX rates) retry transiently a couple of times before giving up.
 - Unrealised P&L is only shown for funds where every transaction has a known amount - it's intentionally left blank rather than guessed for funds seeded from an old `units.csv` via `invest.py --seed`.
 - `layouts/` and `templates/` are leftover empty directories from before `html_summary.py` moved to plain f-string HTML - safe to delete by hand, they're not used or git-tracked.

@@ -101,6 +101,61 @@ def test_seed_transactions_from_units_creates_opening_balance_rows(tmp_path):
     assert transactions_path.exists()
 
 
+def test_reconcile_holdings_computes_deltas_against_current_units(tmp_path):
+    units_path = tmp_path / "units.csv"
+    pd.DataFrame(
+        [
+            {"fund": "Fund A", "units": 100, "url": "https://example.com/a", "type": "fund"},
+            {"fund": "Fund B", "units": 20, "url": "https://example.com/b", "type": "fund"},
+        ]
+    ).to_csv(units_path, index=False)
+
+    changes = transactions.reconcile_holdings(
+        {"Fund A": 105.5, "Fund B": 20.0, "Fund C": 10.0},
+        units_path=units_path,
+    ).set_index("fund")
+
+    assert changes.loc["Fund A", "delta"] == 5.5
+    assert changes.loc["Fund B", "delta"] == 0.0
+    assert changes.loc["Fund C", "current_units"] == 0.0
+    assert changes.loc["Fund C", "delta"] == 10.0
+
+
+def test_apply_reconciliation_only_touches_units_path_and_transactions(tmp_path, monkeypatch):
+    units_path = tmp_path / "units.csv"
+    pd.DataFrame(
+        [{"fund": "Fund A", "units": 100, "url": "https://example.com/a", "type": "fund"}]
+    ).to_csv(units_path, index=False)
+    transactions_path = tmp_path / "transactions.csv"
+    monkeypatch.setattr(transactions, "resolve_transactions_path", lambda: transactions_path)
+
+    # units.csv is always derived by summing transactions.csv, so the
+    # existing 100 units need an opening transaction on record already
+    # (as `invest.py --seed` would create) - otherwise reconciliation has
+    # no history to add the delta on top of.
+    transactions.append_transaction(
+        fund="Fund A", url="https://example.com/a", units=100.0, txn_date="2025-12-01", path=transactions_path
+    )
+
+    changes = pd.DataFrame(
+        [
+            {"fund": "Fund A", "current_units": 100.0, "screenshot_units": 105.5, "delta": 5.5},
+            {"fund": "Fund B", "current_units": 0.0, "screenshot_units": 0.0, "delta": 0.0},
+        ]
+    )
+
+    applied = transactions.apply_reconciliation(changes, txn_date="2026-01-01", units_path=units_path)
+
+    assert applied == ["Fund A"]
+    txns = transactions.load_transactions(transactions_path)
+    assert len(txns) == 2
+    assert txns.loc[1, "units"] == 5.5
+    assert pd.isna(txns.loc[1, "amount_gbp"])
+
+    updated_units = pd.read_csv(units_path)
+    assert updated_units.set_index("fund").loc["Fund A", "units"] == 105.5
+
+
 def test_seed_transactions_from_units_refuses_to_overwrite_existing(tmp_path):
     units_path = tmp_path / "units.csv"
     pd.DataFrame([{"fund": "Fund A", "units": 100, "url": "https://example.com/a"}]).to_csv(units_path, index=False)
