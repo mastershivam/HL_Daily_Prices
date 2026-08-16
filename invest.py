@@ -21,6 +21,8 @@
         --apply to actually write the changes. Cost basis for any top-up
         found this way is left unknown (OCR gives units, not price paid) -
         use the --amount/--units form above for accurate cost tracking.
+        Add --ocr-debug to see exactly what OCR read off the image if
+        matching fails.
 
 The fund must already have a row in units.csv (fund,units,url[,type]) so
 invest.py knows which URL/ticker to price it against.
@@ -70,8 +72,8 @@ def _live_price_gbp(url: str, row_type: str) -> float:
     return parse_price_to_gbp(scraped["sell"], is_share=False)
 
 
-def _sync_from_image(image_path: str, apply_changes: bool, cutoff: float) -> None:
-    from holdings_ocr import parse_holdings_from_words, run_ocr
+def _sync_from_image(image_path: str, apply_changes: bool, cutoff: float, debug: bool = False) -> None:
+    from holdings_ocr import describe_rows, parse_holdings_from_words, run_ocr
 
     units_path = resolve_units_path()
     if not units_path.exists():
@@ -102,19 +104,34 @@ def _sync_from_image(image_path: str, apply_changes: bool, cutoff: float) -> Non
             "python package (e.g. `brew install tesseract` on macOS)."
         ) from exc
 
-    holdings = parse_holdings_from_words(words, known_funds, cutoff=cutoff)
+    if debug:
+        print(f"Known funds in {units_path}: {known_funds}")
+        print("OCR'd rows (this is exactly what matching sees):")
+        for row_text in describe_rows(words):
+            print(f"  {row_text!r}")
+        print()
+
+    holdings, unmatched_candidates = parse_holdings_from_words(words, known_funds, cutoff=cutoff)
+
+    if unmatched_candidates:
+        print("Found in the screenshot but not in units.csv yet (add these by hand, with their HL URL/ticker, to track them):")
+        for candidate in unmatched_candidates:
+            print(f"  {candidate['text']!r} - units: {candidate['units']}")
+        print()
+
     if not holdings:
         raise SystemExit(
-            "Couldn't confidently match any fund in that screenshot. "
-            "Try a clearer/cropped screenshot of just the holdings table, or lower --match-cutoff."
+            "Couldn't confidently match any fund already in units.csv against that screenshot "
+            "(see above for what was found instead). Add the missing funds to units.csv first, "
+            "lower --match-cutoff, or rerun with --ocr-debug to see exactly what OCR read off the image."
         )
 
     changes = reconcile_holdings(holdings)
     print(changes.to_string(index=False))
 
-    unmatched = sorted(set(known_funds) - set(holdings))
-    if unmatched:
-        print(f"\nNot found in screenshot (left unchanged): {', '.join(unmatched)}")
+    not_in_screenshot = sorted(set(known_funds) - set(holdings))
+    if not_in_screenshot:
+        print(f"\nIn units.csv but not found in screenshot (left unchanged): {', '.join(not_in_screenshot)}")
 
     unchanged = changes[changes["delta"].abs() < 1e-6]
     if len(unchanged) == len(changes):
@@ -159,6 +176,11 @@ def main() -> None:
         default=0.6,
         help="With --sync-from-image, fuzzy fund-name match threshold, 0-1 (default 0.6)",
     )
+    parser.add_argument(
+        "--ocr-debug",
+        action="store_true",
+        help="With --sync-from-image, print exactly what OCR read off the image before matching",
+    )
     args = parser.parse_args()
 
     if args.seed:
@@ -167,7 +189,7 @@ def main() -> None:
         return
 
     if args.sync_from_image:
-        _sync_from_image(args.sync_from_image, apply_changes=args.apply, cutoff=args.match_cutoff)
+        _sync_from_image(args.sync_from_image, apply_changes=args.apply, cutoff=args.match_cutoff, debug=args.ocr_debug)
         return
 
     if not args.fund:

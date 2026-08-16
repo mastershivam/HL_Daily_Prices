@@ -55,25 +55,46 @@ def load_units_dataframe(units_path: Path | None = None) -> pd.DataFrame:
     return units_df
 
 
+_CURRENCY_SYMBOLS = {"GBP": "£", "USD": "$", "EUR": "€"}
+
+
 def _scrape_share_row(yahoo_symbol: str) -> dict[str, str | None]:
     """Adapt a yfinance quote into the same shape price_scraper_fund
     returns, so share rows (type='share') flow through the rest of the
     pipeline identically to HL-scraped funds. This is the generalised
     replacement for a single hardcoded reference ticker: any row in
-    units.csv can now be priced via yfinance instead of HL scraping."""
+    units.csv can now be priced via yfinance instead of HL scraping.
+
+    A non-GBP ticker (e.g. a USD-listed US stock) must NOT be formatted
+    using price_pence - that field is only meaningful for GBP/GBp LSE
+    quotes. Using the wrong one here previously understated a USD
+    holding's value by ~100x and skipped currency conversion entirely, by
+    accident treating $38.90 as if it were 38.90 pence.
+    """
     quote = fetch_share_quote(yahoo_symbol)
-    sell_pounds = quote["price_pence"] / 100.0
+    currency = quote.get("currency") or "GBP"
+    symbol = _CURRENCY_SYMBOLS.get(currency, "")
+
+    if currency == "GBP":
+        # Already normalised to pence by fetch_share_quote; convert to
+        # pounds here since is_share=True means "don't divide by 100"
+        # downstream in parse_price_to_gbp.
+        sell_amount = quote["price_pence"] / 100.0
+        change_amount = quote["change_pence"] / 100.0 if quote["change_pence"] is not None else None
+    else:
+        sell_amount = quote["native_price"]
+        change_amount = quote["native_change"]
 
     change_value = None
     change_pct = None
-    if quote["change_pence"] is not None:
-        change_value = f"{quote['change_pence'] / 100.0:+.4f}"
+    if change_amount is not None:
+        change_value = f"{symbol}{change_amount:+.4f}"
     if quote["change_pct"] is not None:
         change_pct = f"{quote['change_pct']:+.2f}%"
 
     return {
         "title": yahoo_symbol,
-        "sell": f"£{sell_pounds:.4f}",
+        "sell": f"{symbol}{sell_amount:.4f}",
         "buy": None,
         "change_value": change_value,
         "change_pct": change_pct,

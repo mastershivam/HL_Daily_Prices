@@ -51,10 +51,22 @@ def price_scraper_fund(url: str) -> dict[str, str | None]:
 
 
 def fetch_share_quote(yahoo_symbol: str) -> dict[str, str | float | None]:
-    """Fetch a listed share quote via yfinance, normalised to pence.
+    """Fetch a listed share quote via yfinance.
 
     LSE quotes are usually reported in GBp (pence); a feed reporting GBP
-    (pounds) is scaled up by 100 so the rest of the app can assume pence.
+    (pounds) is scaled up by 100 so price_pence/change_pence are always in
+    pence for GBP-currency tickers - this is what the watchlist display
+    (e.g. "LON:ELIX: 630.00p") assumes.
+
+    For any OTHER currency (a US-listed stock like SMCI trades in USD, not
+    pence), price_pence/change_pence would be meaningless - callers that
+    need an actual value (not just a pence display) must use
+    native_price/native_change/currency instead, and route the result
+    through the normal currency-conversion pipeline. Get this wrong and a
+    USD holding's value comes out ~100x too small with no FX conversion
+    applied - that used to be exactly what pull_and_collate's type=share
+    handling did.
+
     yfinance is imported lazily so the rest of the module stays usable
     (and testable) without the dependency installed.
     """
@@ -76,13 +88,16 @@ def fetch_share_quote(yahoo_symbol: str) -> dict[str, str | float | None]:
     currency = fetched["currency"]
     scale = 100.0 if currency == "GBP" else 1.0  # GBp/GBX are already pence
     price_pence = float(fetched["last_price"]) * scale
+    native_price = float(fetched["last_price"])
 
     change_pence = None
     change_pct = None
+    native_change = None
     previous_close = fetched["previous_close"]
     if previous_close:
         previous_pence = float(previous_close) * scale
         change_pence = price_pence - previous_pence
+        native_change = native_price - float(previous_close)
         if previous_pence:
             change_pct = (change_pence / previous_pence) * 100.0
 
@@ -91,4 +106,7 @@ def fetch_share_quote(yahoo_symbol: str) -> dict[str, str | float | None]:
         "price_pence": price_pence,
         "change_pence": change_pence,
         "change_pct": change_pct,
+        "currency": currency or "GBP",
+        "native_price": native_price,
+        "native_change": native_change,
     }
