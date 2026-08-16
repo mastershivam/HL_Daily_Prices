@@ -31,5 +31,12 @@ transactions.csv
 urls.txt
 HL_Daily_Prices_Data/
 
+# Screenshots of holdings pages for invest.py --sync-from-image - as
+# sensitive as units.csv, and this repo is public.
+*.png
+*.jpg
+*.jpeg
+*.heic
+
 !.gitkeep
 !sample_units.csv

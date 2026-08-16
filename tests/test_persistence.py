@@ -5,6 +5,13 @@ import pandas as pd
 import persistence
 
 
+def _no_data_dir(monkeypatch):
+    # get_data_dir() is imported into persistence's namespace as
+    # `get_data_dir` - patch it there so resolve_history_path() falls back
+    # to DEFAULT_HISTORY_PATH, as if no private data repo were found.
+    monkeypatch.setattr(persistence, "get_data_dir", lambda: None)
+
+
 def test_load_previous_snapshot_uses_latest_prior_row(tmp_path, monkeypatch):
     history_path = tmp_path / "daily_totals.csv"
     pd.DataFrame(
@@ -15,7 +22,7 @@ def test_load_previous_snapshot_uses_latest_prior_row(tmp_path, monkeypatch):
         ]
     ).to_csv(history_path, index=False)
 
-    monkeypatch.setattr(persistence, "PRIVATE_HISTORY_PATH", tmp_path / "private" / "daily_totals.csv")
+    _no_data_dir(monkeypatch)
     monkeypatch.setattr(persistence, "DEFAULT_HISTORY_PATH", history_path)
 
     previous_total, previous_by_fund = persistence.load_previous_snapshot("2026-04-16", ["Fund A"])
@@ -24,7 +31,7 @@ def test_load_previous_snapshot_uses_latest_prior_row(tmp_path, monkeypatch):
 
 
 def test_load_previous_snapshot_returns_empty_when_history_missing(tmp_path, monkeypatch):
-    monkeypatch.setattr(persistence, "PRIVATE_HISTORY_PATH", tmp_path / "private" / "missing-private.csv")
+    _no_data_dir(monkeypatch)
     monkeypatch.setattr(persistence, "DEFAULT_HISTORY_PATH", tmp_path / "missing-local.csv")
 
     previous_total, previous_by_fund = persistence.load_previous_snapshot("2026-04-16", ["Fund A"])
@@ -36,12 +43,20 @@ def test_load_previous_snapshot_handles_malformed_history(tmp_path, monkeypatch)
     history_path = tmp_path / "daily_totals.csv"
     history_path.write_text("not,a,valid,csv\n1,2", encoding="utf-8")
 
-    monkeypatch.setattr(persistence, "PRIVATE_HISTORY_PATH", tmp_path / "private" / "missing-private.csv")
+    _no_data_dir(monkeypatch)
     monkeypatch.setattr(persistence, "DEFAULT_HISTORY_PATH", history_path)
 
     previous_total, previous_by_fund = persistence.load_previous_snapshot("2026-04-16", ["Fund A"])
     assert previous_total is None
     assert previous_by_fund == {}
+
+
+def test_resolve_history_path_prefers_data_dir_when_found(tmp_path, monkeypatch):
+    data_dir = tmp_path / "HL_Daily_Prices_Data"
+    data_dir.mkdir()
+    monkeypatch.setattr(persistence, "get_data_dir", lambda: data_dir)
+
+    assert persistence.resolve_history_path() == data_dir / "outputs" / "daily_totals.csv"
 
 
 def test_load_history_totals_returns_recent_totals_in_date_order(tmp_path, monkeypatch):
@@ -54,7 +69,7 @@ def test_load_history_totals_returns_recent_totals_in_date_order(tmp_path, monke
         ]
     ).to_csv(history_path, index=False)
 
-    monkeypatch.setattr(persistence, "PRIVATE_HISTORY_PATH", tmp_path / "private" / "daily_totals.csv")
+    _no_data_dir(monkeypatch)
     monkeypatch.setattr(persistence, "DEFAULT_HISTORY_PATH", history_path)
 
     assert persistence.load_history_totals() == [100.0, 110.0, 120.0]
@@ -62,7 +77,7 @@ def test_load_history_totals_returns_recent_totals_in_date_order(tmp_path, monke
 
 
 def test_load_history_totals_returns_empty_list_when_missing(tmp_path, monkeypatch):
-    monkeypatch.setattr(persistence, "PRIVATE_HISTORY_PATH", tmp_path / "private" / "missing.csv")
+    _no_data_dir(monkeypatch)
     monkeypatch.setattr(persistence, "DEFAULT_HISTORY_PATH", tmp_path / "missing-local.csv")
 
     assert persistence.load_history_totals() == []

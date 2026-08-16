@@ -17,27 +17,29 @@ from pathlib import Path
 
 import pandas as pd
 
+from config import get_data_dir
+
 
 DEFAULT_UNITS_PATH = Path("units.csv")
-PRIVATE_UNITS_PATH = Path("HL_Daily_Prices_Data") / "units.csv"
 DEFAULT_TRANSACTIONS_PATH = Path("transactions.csv")
-PRIVATE_TRANSACTIONS_PATH = Path("HL_Daily_Prices_Data") / "transactions.csv"
 
 TRANSACTION_COLUMNS = ["date", "fund", "url", "units", "price_gbp", "amount_gbp", "note"]
 
 
 def resolve_units_path() -> Path:
     # Mirrors persistence.resolve_history_path: prefer the private data-repo
-    # copy whenever that directory exists, so local dev and CI automation
-    # read/write the same file.
-    if PRIVATE_UNITS_PATH.parent.exists():
-        return PRIVATE_UNITS_PATH
+    # copy whenever it can be found (see config.get_data_dir), so local dev
+    # and CI automation read/write the same file.
+    data_dir = get_data_dir()
+    if data_dir is not None:
+        return data_dir / "units.csv"
     return DEFAULT_UNITS_PATH
 
 
 def resolve_transactions_path() -> Path:
-    if PRIVATE_TRANSACTIONS_PATH.parent.exists():
-        return PRIVATE_TRANSACTIONS_PATH
+    data_dir = get_data_dir()
+    if data_dir is not None:
+        return data_dir / "transactions.csv"
     return DEFAULT_TRANSACTIONS_PATH
 
 

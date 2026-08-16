@@ -6,7 +6,7 @@ Automates a daily portfolio snapshot using Hargreaves Lansdown prices. It reads 
 
 - `python main.py` is the main entrypoint.
 - The GitHub Actions workflow runs the same entrypoint on a schedule.
-- Holdings data is expected in `HL_Daily_Prices_Data/units.csv` when running in automation, or a local `units.csv` in the repo root otherwise.
+- Holdings data lives in the private `HL_Daily_Prices_Data` repo, found automatically: nested under this repo (what GitHub Actions' `git clone` produces), as a *sibling* folder next to this one (the normal local dev layout - two separate folders side by side, neither inside the other), or via an explicit `HL_DATA_DIR=/path/to/HL_Daily_Prices_Data` in `.env`. Falls back to a local `units.csv` in this repo's root if none of those are found.
 - Outputs are written locally to:
   - `daily_totals.csv`
   - `summaries/daily_summary-YYYY-MM-DD.html`

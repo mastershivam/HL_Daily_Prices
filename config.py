@@ -1,10 +1,14 @@
 from dataclasses import dataclass
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
 
 load_dotenv()
+
+DATA_DIR_NAME = "HL_Daily_Prices_Data"
+REPO_ROOT = Path(__file__).resolve().parent
 
 
 def env(name: str, default: str = "") -> str:
@@ -77,6 +81,43 @@ def get_push_settings() -> PushSettings:
 
 def get_debug_mode() -> bool:
     return env_flag("DEBUG", default=False)
+
+
+def get_data_dir() -> Path | None:
+    """Locate the private HL_Daily_Prices_Data directory holding
+    units.csv/transactions.csv/daily_totals.csv, checked in order:
+
+    1. HL_DATA_DIR env var - an explicit override (absolute or relative).
+    2. ./HL_Daily_Prices_Data relative to the current working directory -
+       what GitHub Actions produces (`git clone` runs *inside* this repo's
+       checkout, nesting the data repo one level down).
+    3. A directory named HL_Daily_Prices_Data that's a *sibling* of this
+       repo's own directory - how the two repos actually sit on disk for
+       local development (two separate folders side by side, e.g. both
+       directly under ~/Random_Python/, neither nested in the other).
+       Resolving purely off cwd (option 2) never finds it in that layout
+       even though it's right there, so this used to silently fall back to
+       a stale/placeholder local units.csv instead of the real data.
+
+    Returns None if none of these exist, so callers fall back to purely
+    local files (daily_totals.csv, units.csv, transactions.csv in this
+    repo's own root).
+    """
+    env_dir = env("HL_DATA_DIR")
+    if env_dir:
+        candidate = Path(env_dir).expanduser()
+        if candidate.exists():
+            return candidate
+
+    cwd_relative = Path(DATA_DIR_NAME)
+    if cwd_relative.exists():
+        return cwd_relative
+
+    sibling = REPO_ROOT.parent / DATA_DIR_NAME
+    if sibling.exists():
+        return sibling
+
+    return None
 
 
 def get_watchlist_tickers() -> tuple[str, ...]:

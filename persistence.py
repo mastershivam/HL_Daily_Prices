@@ -2,17 +2,21 @@ from pathlib import Path
 
 import pandas as pd
 
+from config import get_data_dir
+
 
 DEFAULT_HISTORY_PATH = Path("daily_totals.csv")
-PRIVATE_HISTORY_PATH = Path("HL_Daily_Prices_Data") / "outputs" / "daily_totals.csv"
 
 
 def resolve_history_path() -> Path:
-    # Prefer the private data-repo location whenever that directory is present,
-    # so reads and writes always target the same file (including the first run,
-    # before the history file itself exists).
-    if PRIVATE_HISTORY_PATH.parent.exists():
-        return PRIVATE_HISTORY_PATH
+    # Prefer the private data-repo location whenever it can be found (see
+    # config.get_data_dir for how - covers both the CI clone-into-checkout
+    # layout and the sibling-folders local dev layout), so reads and writes
+    # always target the same file (including the first run, before the
+    # history file itself exists).
+    data_dir = get_data_dir()
+    if data_dir is not None:
+        return data_dir / "outputs" / "daily_totals.csv"
     return DEFAULT_HISTORY_PATH
 
 
