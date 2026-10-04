@@ -177,6 +177,9 @@ def normalise_merged_dataframe(merged_data_df: pd.DataFrame) -> pd.DataFrame:
         convert_value_to_gbp(value, currency, fx_rates.get(currency, 1.0))
         for value, currency in zip(merged_data_df["value"], merged_data_df["currency"])
     ]
+    # "currency" describes the holding value (always GBP after conversion);
+    # keep the quote's own currency so reports can show $43.69, not £43.69.
+    merged_data_df["price_currency"] = merged_data_df["currency"]
     merged_data_df.loc[merged_data_df["currency"] != "GBP", "currency"] = "GBP"
 
     return merged_data_df.drop(columns=["title"])
@@ -221,6 +224,7 @@ def create_data_frame(debug: bool = False) -> tuple[pd.DataFrame, list[str]]:
             "change_pct": "Percentage Change",
             "url": "URL",
             "currency": "Currency",
+            "price_currency": "Price Currency",
             "value": "Total Holding Value",
         },
         axis=1,

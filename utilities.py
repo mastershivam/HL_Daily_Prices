@@ -30,10 +30,36 @@ def with_retries(fn, retries: int = 2, backoff: float = 1.0, exceptions: tuple =
 
 
 def get_fx_rate_to_gbp(currency: str) -> float:
-    """Fetch a spot FX rate converting 1 unit of `currency` into GBP."""
+    """Fetch a spot FX rate converting 1 unit of `currency` into GBP.
+
+    Uses Yahoo's live quote (e.g. USDGBP=X) - the same source and moment as
+    the share prices, and what HL values foreign holdings with. Previously
+    this used the ECB daily reference rate (frankfurter), which is fixed at
+    ~13:15 London; by the US close the pound can have moved a few tenths of
+    a percent, which put US holdings ~0.3% (about £10 on Super Micro) out
+    versus HL. Frankfurter is kept as a fallback if Yahoo fails.
+    """
     if currency == "GBP":
         return 1.0
 
+    try:
+        return with_retries(lambda: _fetch_yahoo_fx_rate(currency), retries=2, backoff=1.0, exceptions=(Exception,))
+    except Exception as exc:  # noqa: BLE001 - any Yahoo failure falls back
+        logger.warning("Yahoo FX rate for %s->GBP unavailable (%s); falling back to ECB reference rate", currency, exc)
+    return _fetch_ecb_fx_rate(currency)
+
+
+def _fetch_yahoo_fx_rate(currency: str) -> float:
+    import yfinance as yf  # lazy: keeps this module importable without yfinance
+
+    rate = yf.Ticker(f"{currency}GBP=X").fast_info.get("lastPrice")
+    rate = float(rate) if rate is not None else 0.0
+    if not rate > 0:
+        raise ValueError(f"No Yahoo FX quote for {currency}GBP=X")
+    return rate
+
+
+def _fetch_ecb_fx_rate(currency: str) -> float:
     def _fetch() -> float:
         response = requests.get(
             f"https://api.frankfurter.dev/v1/latest?base={currency}&symbols=GBP",

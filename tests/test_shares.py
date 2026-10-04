@@ -75,3 +75,39 @@ def test_usd_share_row_gets_converted_to_gbp_end_to_end(monkeypatch):
     # (the old bug) and not left in USD (also the old bug).
     assert normalised.loc["Super Micro Computer Inc", "value"] == 3112.0
     assert normalised.loc["Super Micro Computer Inc", "currency"] == "GBP"
+
+
+def test_fx_rate_prefers_yahoo_and_falls_back_to_ecb(monkeypatch):
+    import utilities
+
+    monkeypatch.setattr(utilities, "_fetch_yahoo_fx_rate", lambda currency: 0.7551)
+    monkeypatch.setattr(utilities, "_fetch_ecb_fx_rate", lambda currency: 0.7575)
+    assert utilities.get_fx_rate_to_gbp("USD") == 0.7551
+    assert utilities.get_fx_rate_to_gbp("GBP") == 1.0
+
+    def broken(currency):
+        raise ValueError("no quote")
+
+    monkeypatch.setattr(utilities, "_fetch_yahoo_fx_rate", broken)
+    monkeypatch.setattr(utilities.time, "sleep", lambda s: None)
+    assert utilities.get_fx_rate_to_gbp("USD") == 0.7575
+
+
+def test_html_shows_us_share_price_in_dollars_and_value_in_pounds():
+    import pandas as pd
+    from html_summary import build_html_summary
+
+    data = pd.DataFrame(
+        {
+            "Units": [100.0, 10.0],
+            "Sell Price": [43.69, 4.01],
+            "Price Currency": ["USD", "GBP"],
+            "Currency": ["GBP", "GBP"],
+            "Total Holding Value": [3298.84, 40.10],
+        },
+        index=pd.Index(["Super Micro", "Some Fund"], name="Fund/Share"),
+    )
+    html = build_html_summary(data, 3338.94, "2026-10-04", previous_total=3300.0, previous_by_fund={})
+    assert "$43.69" in html and "£43.69" not in html
+    assert "£4.01" in html and "£3,298.84" in html
+    assert "Price Currency" not in html

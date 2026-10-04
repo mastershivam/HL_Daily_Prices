@@ -132,9 +132,20 @@ def build_html_summary(
     # HTML table
     # Format columns if present
     formatters = {}
+    sell_preformatted = False
+    if "Sell Price" in df_display.columns and "Price Currency" in df_display.columns:
+        # Sell Price is in the quote's own currency (e.g. USD for US shares),
+        # only Total Holding Value is converted - label it accordingly.
+        symbols = {"GBP": "£", "USD": "$", "EUR": "€"}
+        df_display["Sell Price"] = [
+            f"{symbols.get(str(cur), str(cur) + ' ')}{float(v):,.2f}" if pd.notna(v) else ""
+            for v, cur in zip(df_display["Sell Price"], df_display["Price Currency"])
+        ]
+        df_display = df_display.drop(columns=["Price Currency"])
+        sell_preformatted = True
     if "Total Holding Value" in df_display.columns:
         formatters["Total Holding Value"] = lambda v: f"£{v:,.2f}" if pd.notna(v) else ""
-    if "Sell Price" in df_display.columns:
+    if "Sell Price" in df_display.columns and not sell_preformatted:
         formatters["Sell Price"] = lambda v: f"£{v:,.2f}" if pd.notna(v) else ""
     if "DoD Change" in df_display.columns:
         formatters["DoD Change"] = lambda v: ("+" if v is not None and v >= 0 else "") + (f"£{v:,.2f}" if v is not None else "")
