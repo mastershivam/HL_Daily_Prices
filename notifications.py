@@ -41,17 +41,23 @@ def format_push_message(
     elix_change_pct: float | None = None,
     watchlist_quotes: list[dict] | None = None,
     failed_funds: list[str] | None = None,
+    regular_investments: list[dict] | None = None,
+    plan_error: str | None = None,
 ) -> str:
     message = f"Portfolio total: GBP {total:,.2f}"
+    invested_today = sum(float(b["amount_gbp"]) for b in (regular_investments or []))
     if previous_total is None:
         base_message = message
     else:
-        diff = total - previous_total
+        # Money paid in isn't performance - strip it out of the DoD move.
+        diff = total - previous_total - invested_today
         if previous_total == 0:
             base_message = f"{message} ({diff:+,.2f})"
         else:
             pct = (diff / previous_total) * 100.0
             base_message = f"{message} ({diff:+,.2f}, {pct:+.2f}%)"
+        if invested_today:
+            base_message += f" excl. GBP {invested_today:,.2f} invested"
 
     lines = [base_message]
 
@@ -68,6 +74,14 @@ def format_push_message(
         ]
     for quote in quotes:
         lines.append(_format_watchlist_line(quote))
+
+    if regular_investments:
+        parts = ", ".join(f"{b['label']} {b['amount_gbp']:,.0f} ({b['month']})" for b in regular_investments)
+        lines.append(f"💷 Recorded regular investment: GBP {invested_today:,.2f} - {parts}")
+        if any("approximate" in b.get("price_source", "") for b in regular_investments):
+            lines.append("⚠ Some buys used today's price (no history for the dealing date) - units are approximate")
+    if plan_error:
+        lines.append(f"⚠ Regular investments not applied: {plan_error}")
 
     if failed_funds:
         lines.append(f"⚠ Could not price {len(failed_funds)} holding(s): {', '.join(failed_funds)}")

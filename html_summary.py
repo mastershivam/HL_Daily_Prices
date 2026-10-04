@@ -66,6 +66,8 @@ def build_html_summary(
     failed_funds: list[str] | None = None,
     history_totals: list[float] | None = None,
     cost_basis_by_fund: dict[str, float] | None = None,
+    regular_investments: list[dict] | None = None,
+    plan_error: str | None = None,
 ) -> str:
     # Convert index to column for display
     df_display = data.reset_index().rename(columns={"index": "Fund/Share"})
@@ -151,7 +153,8 @@ def build_html_summary(
     total_badge = f"Total: £{total:,.2f}"
     total_class = "total flat"
     if previous_total is not None:
-        diff = total - previous_total
+        # Exclude money paid in today so the DoD move reflects performance.
+        diff = total - previous_total - sum(float(b["amount_gbp"]) for b in (regular_investments or []))
         pct = None if previous_total == 0 else ((diff / previous_total) * 100.0)
         sign = "+" if diff >= 0 else ""
         pct_txt = f" ({'+' if (pct is not None and pct >= 0) else ''}{pct:.2f}%)" if pct is not None else ""
@@ -202,6 +205,14 @@ def build_html_summary(
         warning_html = (
             f'<div class="warning">⚠ Could not price {len(failed_funds)} holding(s), excluded from the total: {names}</div>'
         )
+    if regular_investments:
+        invested = sum(float(b["amount_gbp"]) for b in regular_investments)
+        parts = ", ".join(
+            f"{b['label']} £{b['amount_gbp']:,.2f} ({b['units']:.4f} units, {b['month']})" for b in regular_investments
+        )
+        warning_html += f'<div class="warning">💷 Recorded regular investment of £{invested:,.2f}: {parts}</div>'
+    if plan_error:
+        warning_html += f'<div class="warning">⚠ Regular investments not applied: {plan_error}</div>'
 
     html=f"""
     <html>

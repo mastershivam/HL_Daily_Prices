@@ -123,6 +123,16 @@ def scrape_fund_rows(units_df: pd.DataFrame, debug: bool = False) -> tuple[list[
                 logger.warning("Failed to scrape %s - no title found", fund_name)
                 failed_funds.append(str(fund_name))
                 continue
+            if not data.get("sell"):
+                # The page loaded (so it has a title) but no price could be
+                # parsed from it - e.g. HL changed the page layout or the URL
+                # now points somewhere without a "Sell:" price. This used to
+                # slip through and get silently dropped later by
+                # dropna(subset=["sell"]), so the holding vanished from the
+                # total with no warning in the push/email.
+                logger.warning("Failed to scrape %s - page loaded but no sell price found", fund_name)
+                failed_funds.append(str(fund_name))
+                continue
             data["key"] = improved_normalise_key(data["title"])
             data["url"] = url
             data["fund_name"] = fund_name
@@ -189,6 +199,13 @@ def create_data_frame(debug: bool = False) -> tuple[pd.DataFrame, list[str]]:
             logger.warning("Excluded fund: %s", fund)
             if fund not in failed_funds:
                 failed_funds.append(str(fund))
+
+    # Safety net: anything without a usable price at this point must still
+    # be reported, never dropped silently.
+    for fund in merged_data_df[merged_data_df["sell"].isna()].index:
+        if str(fund) not in failed_funds:
+            logger.warning("Excluded fund with no sell price: %s", fund)
+            failed_funds.append(str(fund))
 
     merged_data_df = merged_data_df.dropna(subset=["title", "sell"])
     if merged_data_df.empty:

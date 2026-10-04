@@ -145,7 +145,7 @@ def sync_units_csv_from_transactions(
     out_rows = [
         {
             "fund": row["fund"],
-            "units": row["units"],
+            "units": round(float(row["units"]), 6),  # avoid float noise like 14.104700000000001
             "url": row["url"],
             "type": type_by_fund.get(row["fund"], "fund"),
         }

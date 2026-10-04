@@ -61,9 +61,17 @@ jobs:
           # daily_totals.csv is already written in place under outputs/ by the app
           mkdir -p outputs/summaries
           if [ -f ../summaries/latest.html ]; then cp ../summaries/latest.html outputs/summaries/latest.html; fi
-          git add -f outputs/daily_totals.csv outputs/summaries/latest.html || true
+          # units.csv / transactions.csv change when a regular investment is
+          # auto-recorded (see regular_investments.py); daily_prices.csv
+          # keeps the per-fund price history those buys are priced from.
+          # (added one by one: a single missing path would make git add skip all of them)
+          for f in outputs/daily_totals.csv outputs/daily_prices.csv outputs/summaries/latest.html units.csv transactions.csv; do
+            if [ -f "$f" ]; then git add -f "$f"; fi
+          done
           if ! git diff --cached --quiet; then
-            git commit -m "Update outputs: daily_totals.csv and latest.html (run ${{ github.run_id }})"
+            git commit -m "Update outputs (run ${{ github.run_id }})"
+            # In case you edited the data repo (e.g. investment_plan.csv) on GitHub mid-run
+            git pull --rebase origin "$(git rev-parse --abbrev-ref HEAD)"
             git push origin HEAD
           else
             echo "No changes to commit in data repo"

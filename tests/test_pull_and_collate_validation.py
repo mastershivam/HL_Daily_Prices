@@ -68,3 +68,31 @@ def test_scrape_fund_rows_reports_failed_funds_without_raising(monkeypatch):
 
     assert len(rows) == 1
     assert failed_funds == ["Broken Fund"]
+
+
+def test_holding_whose_page_has_no_sell_price_is_reported_not_silently_dropped(monkeypatch, tmp_path):
+    """Regression: a page that loads (has a title) but yields no "Sell:" price
+    used to be dropped from the total with failed_funds left empty, so the
+    push notification gave no warning (this hid Super Micro for months)."""
+    import pull_and_collate
+
+    units_path = _write_units(
+        tmp_path,
+        [
+            {"fund": "Good Fund", "units": 10, "url": "https://example.com/funds/good", "type": "fund"},
+            {"fund": "No Price Share", "units": 100, "url": "https://example.com/shares/noprice", "type": "fund"},
+        ],
+    )
+    monkeypatch.setattr(pull_and_collate, "resolve_units_path", lambda: units_path)
+
+    def fake_price_scraper_fund(url):
+        if "noprice" in url:
+            return {"title": "No Price Share", "sell": None, "buy": None, "change_value": None, "change_pct": None}
+        return {"title": "Good Fund", "sell": "100.00p", "buy": None, "change_value": None, "change_pct": None}
+
+    monkeypatch.setattr(pull_and_collate, "price_scraper_fund", fake_price_scraper_fund)
+
+    data, failed_funds = pull_and_collate.create_data_frame()
+
+    assert list(data.index) == ["Good Fund"]
+    assert failed_funds == ["No Price Share"]

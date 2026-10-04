@@ -11,6 +11,7 @@ from notifications import build_notification_subject, format_push_message, send_
 from persistence import load_history_totals, load_previous_snapshot, update_daily_totals
 from price_scraper import fetch_share_quote
 from pull_and_collate import create_data_frame
+from regular_investments import apply_regular_investments, apply_to_dataframe, update_daily_prices
 from transactions import compute_positions, load_transactions
 
 
@@ -79,10 +80,29 @@ def _cost_basis_by_fund() -> dict[str, float]:
 def _run(debug_mode: bool, push_settings) -> None:
     data, failed_funds = create_data_frame(debug=debug_mode)
     logger.debug("Final dataframe:\n%s", data)
-    total = float(data["Total Holding Value"].sum())
     today_str = date.today().isoformat()
 
+    # Record any regular (direct-debit) buys that have dealt since the last
+    # run, so units.csv keeps up with HL without hand-editing. A problem
+    # here (e.g. a typo in investment_plan.csv) must never stop the daily
+    # summary - it's reported in the push instead.
+    regular_investments: list[dict] = []
+    plan_error: str | None = None
+    try:
+        regular_investments = apply_regular_investments(data)
+        if regular_investments:
+            data = apply_to_dataframe(data, regular_investments)
+    except Exception as exc:
+        logger.exception("Could not apply regular investments")
+        plan_error = str(exc)
+
+    total = float(data["Total Holding Value"].sum())
+
     update_daily_totals(data, total, today_str)
+    try:
+        update_daily_prices(data, today_str)
+    except Exception:
+        logger.exception("Could not update daily_prices.csv")
     previous_total, previous_by_fund = load_previous_snapshot(today_str, data.index.tolist())
 
     # If funds vanished from history and different ones appeared in the same
@@ -114,6 +134,8 @@ def _run(debug_mode: bool, push_settings) -> None:
         failed_funds=failed_funds,
         history_totals=history_totals,
         cost_basis_by_fund=cost_basis_by_fund,
+        regular_investments=regular_investments,
+        plan_error=plan_error,
     )
     write_summary_files(html_summary, today_str)
 
@@ -123,6 +145,8 @@ def _run(debug_mode: bool, push_settings) -> None:
         previous_total,
         watchlist_quotes=watchlist_quotes,
         failed_funds=failed_funds,
+        regular_investments=regular_investments,
+        plan_error=plan_error,
     )
 
     send_push_notification(push_settings, subject, push_message)

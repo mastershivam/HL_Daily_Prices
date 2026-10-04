@@ -37,6 +37,26 @@ python invest.py "Baillie Gifford Japanese" --units 12.34 --price 40.52
 
 Both append a transaction to `transactions.csv` and regenerate `units.csv` automatically. The fund must already have a row in `units.csv` so `invest.py` knows which URL/ticker to price it against.
 
+### Regular investments are recorded automatically
+
+Your monthly direct debit no longer needs recording at all. Describe it once in `investment_plan.csv` in the private data repo (edit it on GitHub whenever your contribution changes):
+
+```csv
+fund,monthly_amount_gbp,day_of_month,start_month
+BlackRock Continental European Income,300,10,2026-09
+Landseer Global Artificial Intelligence,150,10,2026-09
+Vanguard FTSE Global All Cap,300,10,2026-09
+```
+
+- `fund` only needs enough of the units.csv name to pick out one fund (case-insensitive).
+- Change `monthly_amount_gbp` when you change your direct debit. Months already recorded keep their old amount. Set it to `0` to pause.
+- `day_of_month` is HL's dealing day (default 10). Weekends roll to Monday.
+- `start_month` is the first month to record. Earlier months are never touched.
+
+On the first daily run after each dealing date, `regular_investments.py` records the buy in `transactions.csv` at that day's fund price, regenerates `units.csv`, and the push says what it recorded (the day's change shown excludes the money paid in). Each fund+month is recorded once, so re-runs never double count. Prices come from `outputs/daily_prices.csv` (written every run). Before that file exists they come from `daily_totals.csv`, and failing that from today's price, which the push flags as approximate. Run `python regular_investments.py` for a dry run that shows which months are recorded or due.
+
+One-off lump sums still go through `invest.py "Fund" --amount ...`. HL fees and rounding mean units can drift slightly over time; a screenshot sync (below) now and then trues them up.
+
 ### Syncing from a screenshot instead
 
 If you'd rather not type `invest.py "Fund" --amount ...` every time, take a screenshot of your HL holdings page and run:
